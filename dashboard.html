@@ -1063,6 +1063,16 @@
   </div>
 </div>
 
+<div id="watcherBar" style="background:#1a1a2e;border-bottom:1px solid #2a2a3e;padding:6px 20px;display:flex;align-items:center;gap:16px;font-size:0.85em;color:#8888aa;">
+  <span id="watcherStatus" style="display:flex;align-items:center;gap:4px;">
+    <span id="watcherDot" style="width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;"></span>
+    <span>Watcher</span>
+  </span>
+  <span id="watcherCondition" style="color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">--</span>
+  <span id="watcherHeartbeat" style="color:#666;font-size:0.9em;">--</span>
+  <span id="watcherTrigger" style="color:#666;font-size:0.9em;">--</span>
+</div>
+
 <div class="container">
 
   <!-- Header -->
@@ -2317,6 +2327,21 @@ countdownTimer = setInterval(tickCountdown, 1000);
 updateCountdownDisplay();
 setInterval(loadTicker, 5000);
 setInterval(randomQuote, 60000);
+
+// Watcher status
+async function loadWatcher() {
+  try {
+    const r = await fetch('/api/watcher');
+    const d = await r.json();
+    const dot = document.getElementById('watcherDot');
+    dot.style.background = d.running ? '#00d4aa' : '#ff4444';
+    document.getElementById('watcherCondition').textContent = d.condition || 'No condition';
+    document.getElementById('watcherHeartbeat').textContent = d.last_heartbeat ? '♥ ' + d.last_heartbeat.slice(11, 19) : '';
+    document.getElementById('watcherTrigger').textContent = d.last_trigger ? '⚡ ' + d.last_trigger.slice(11, 19) : '';
+  } catch(e) {}
+}
+loadWatcher();
+setInterval(loadWatcher, 15000);
 
 // Back to top button
 window.addEventListener('scroll', () => {

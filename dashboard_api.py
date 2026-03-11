@@ -144,6 +144,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_calendar())
         elif path == "/api/mode":
             self._json_response({"demo": OKX_DEMO})
+        elif path == "/api/watcher":
+            self._json_response(self._get_watcher_status())
         elif path == "/mobile" or path == "/mobile.html":
             self._serve_file("mobile.html")
         elif path == "/" or path == "/index.html":
@@ -310,6 +312,45 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             }
             for r in rows
         ]
+
+    def _get_watcher_status(self):
+        """获取 watcher 运行状态"""
+        import subprocess
+        project = Path(__file__).parent
+        result = {"running": False, "condition": "", "last_heartbeat": "", "last_trigger": ""}
+        # 检查进程
+        try:
+            out = subprocess.check_output(["pgrep", "-f", "watcher.py"], text=True, timeout=3)
+            result["running"] = bool(out.strip())
+        except Exception:
+            result["running"] = False
+        # 读监控条件
+        cond_file = project / "watch_condition.py"
+        if cond_file.exists():
+            try:
+                first_line = cond_file.read_text().split("\n")
+                for line in first_line:
+                    line = line.strip().strip('"').strip("'")
+                    if line and not line.startswith("#") and not line.startswith("import") and not line.startswith("def"):
+                        result["condition"] = line
+                        break
+            except Exception:
+                pass
+        # 读日志最后几行
+        log_file = Path.home() / "watcher.log"
+        if log_file.exists():
+            try:
+                lines = log_file.read_text().strip().split("\n")
+                for line in reversed(lines[-20:]):
+                    if "💓" in line and not result["last_heartbeat"]:
+                        result["last_heartbeat"] = line.split("]")[0].replace("[", "").strip()
+                    if "🚨" in line and not result["last_trigger"]:
+                        result["last_trigger"] = line.split("]")[0].replace("[", "").strip()
+                    if result["last_heartbeat"] and result["last_trigger"]:
+                        break
+            except Exception:
+                pass
+        return result
 
     def _get_recent_reasoning(self):
         try:
