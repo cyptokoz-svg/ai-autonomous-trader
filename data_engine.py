@@ -16,7 +16,7 @@ import aiohttp
 import pandas as pd
 import pandas_ta as ta
 
-from config import PAIRS, TIMEFRAMES, OKX_BASE_URL, EMA_PERIODS
+from config import PAIRS, TIMEFRAMES, OKX_BASE_URL, EMA_PERIODS, OKX_DEMO
 
 logger = logging.getLogger("data_engine")
 
@@ -68,8 +68,10 @@ class DataEngine:
         """主更新入口, 由外部调用."""
         now = time.time()
         try:
+            headers = {"x-simulated-trading": "1"} if OKX_DEMO else {}
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=15)
+                timeout=aiohttp.ClientTimeout(total=15),
+                headers=headers,
             ) as session:
                 tasks: list[asyncio.Task] = []
 

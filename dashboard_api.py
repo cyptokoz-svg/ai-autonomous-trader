@@ -92,11 +92,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         return [dict(r) for r in rows]
 
     def _get_prices(self):
-        """从 OKX 公共 API 实时拉取 BTC/ETH 价格"""
+        """从 OKX 公共 API 实时拉取 BTC/ETH 价格（自动匹配模拟/实盘）"""
         result = {"btc": {}, "eth": {}}
+        _headers = {"User-Agent": "Mozilla/5.0"}
+        if OKX_DEMO:
+            _headers["x-simulated-trading"] = "1"
         try:
             url = "https://www.okx.com/api/v5/market/tickers?instType=SWAP"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            req = urllib.request.Request(url, headers=_headers)
             resp = urllib.request.urlopen(req, timeout=5)
             data = json.loads(resp.read())
             for t in data.get("data", []):
@@ -123,7 +126,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         try:
             for pair, key in [("BTC-USDT-SWAP", "btc"), ("ETH-USDT-SWAP", "eth")]:
                 url = f"https://www.okx.com/api/v5/public/funding-rate?instId={pair}"
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                req = urllib.request.Request(url, headers=_headers)
                 resp = urllib.request.urlopen(req, timeout=3)
                 data = json.loads(resp.read())
                 fr = data.get("data", [{}])[0].get("fundingRate", "")
