@@ -9,10 +9,11 @@ AI 驱动的加密货币自主交易系统，专注 BTC/ETH 永续合约。基�
 ## 特性
 
 - **全自主交易** — 每 30 分钟自动分析市场、决策、执行，无需人工干预
-- **多时间框架分析** — 日线(趋势) → 4H(中期) → 1H/15m(入场)
+- **多时间框架分析** — 日线(趋势) → 4H(中期) → 1H/15m(入场)，20+ 技术指标
 - **硬编码风控** — 单笔亏损 ≤5%、最大回撤 ≤20%、杠杆 ≤5x、必须止损
 - **自我学习** — 每日/每周自动复盘，淘汰失效策略，进化有效规则
-- **实时 Dashboard** — 单页面仪表盘，权益曲线、持仓监控、AI 推理过程全透明
+- **实时 Dashboard** — 权益曲线、持仓监控、AI 推理过程、信号胜率排名全透明
+- **生产级可靠** — 看门狗故障告警、Telegram 通知、数据库自动备份
 - **模拟/实盘切换** — 一键切换 Demo/Live 模式
 
 ## 架构
@@ -36,10 +37,14 @@ AI 驱动的加密货币自主交易系统，专注 BTC/ETH 永续合约。基�
 |------|------|
 | `dashboard.html` | 前端仪表盘（单文件，含 CSS/JS） |
 | `dashboard_api.py` | 后端 API 服务器，端口 8888 |
-| `data_engine.py` | 数据引擎：拉取 K 线 + 计算技术指标 |
+| `data_engine.py` | 数据引擎：拉取 K 线 + 计算 20+ 技术指标 |
 | `trade_db.py` | 数据库层：交易记录、轮次日志、复盘 |
 | `risk_check.py` | 风控硬检查：铁律不可被 AI 绕过 |
+| `prepare.py` | 智能报告生成：增量输出，节省 token |
 | `stats.py` | 统计报告生成 |
+| `notify.py` | Telegram 通知：开仓/平仓/异常推送 |
+| `watchdog.py` | 故障看门狗：系统停摆、孤儿持仓、API 告警 |
+| `backup_db.py` | 数据库自动备份（保留最近 7 份） |
 | `config.py` | 全局配置：交易对、时间框架、EMA 参数 |
 | `trigger.md` | AI 触发 Prompt：每轮执行流程 |
 | `ai-trader-prompt.md` | AI 分析决策 Prompt：交易逻辑核心 |
@@ -179,6 +184,19 @@ default_profile = "live"  # 切换到实盘
 - **前端**: 原生 HTML/CSS/JS（零依赖，单文件）
 - **交易所**: OKX API (REST + MCP)
 - **AI**: Claude Code (Anthropic)
+
+## 技术指标（20+）
+
+| 类别 | 指标 |
+|------|------|
+| 趋势 | EMA(7/25/99), SMA(50/200), SuperTrend, MACD |
+| 动量 | RSI, MFI, StochK/D, ROC |
+| 波动 | ATR, ADX, Bollinger Bands |
+| 量价 | OBV, CMF, 量比, VWAP |
+| 支撑阻力 | Pivot Points (S1/P/R1) |
+| 链上/盘口 | 资金费率(趋势), 多空持仓比, 盘口买卖比, OI |
+
+AI 自由组合，实战数据反馈优胜劣汰。
 
 ## 免责声明
 
