@@ -6,7 +6,7 @@
 
 1. **拉数据（一键完成，~3秒）**
    ```bash
-   cd ~/Desktop/ai-autonomous-trader && python3 prepare.py
+   python3 prepare.py
    ```
    自动拉取：行情K线 + 技术指标 + 交易统计 + 持仓信息
    自动匹配模拟盘/实盘（读 config.py 的 OKX_DEMO）
@@ -44,7 +44,7 @@
 
 6. **风控硬检查（开仓前必过）**
    ```bash
-   cd ~/Desktop/ai-autonomous-trader && python3 risk_check.py '<JSON决策>' <当前权益>
+   python3 risk_check.py '<JSON决策>' <当前权益>
    ```
    输出 PASS → 继续执行
    输出 REJECT → 不执行，记录原因
@@ -72,7 +72,7 @@
    - 重要：strategy-notes.md 的更新会出现在下一轮的 latest_report.txt 中
    - **同步 Claude 记忆**（每次平仓后必做）：
      ```bash
-     cd ~/Desktop/ai-autonomous-trader && python3 stats.py --update
+     python3 stats.py --update
      ```
      自动从 trades.db 生成 → performance.md + signal-scores.md
      然后手动更新 trading-log.md（只保留最近5笔教训）
@@ -100,7 +100,7 @@
 
 4. **今日统计**
    ```bash
-   cd ~/Desktop/ai-autonomous-trader && python3 stats.py
+   python3 stats.py
    ```
 
 5. **写入总结**
@@ -278,7 +278,7 @@ def check(prices, history):
 
 **写入方式：**
 ```bash
-cat > ~/ai-autonomous-trader/watch_condition.py << 'PYEOF'
+cat > watch_condition.py << 'PYEOF'
 # 你的代码
 PYEOF
 ```

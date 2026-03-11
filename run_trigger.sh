@@ -24,4 +24,5 @@ trap 'grep -q "^cron:$$:" "$LOCK" 2>/dev/null && rm -f "$LOCK"' EXIT
 
 # 执行
 cd "$DIR"
+unset CLAUDECODE
 $PYTHON prepare.py && claude --dangerously-skip-permissions -p trigger.md
