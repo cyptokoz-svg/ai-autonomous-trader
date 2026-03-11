@@ -198,7 +198,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _get_prices(self):
         """从 OKX 公共 API 实时拉取 BTC/ETH 价格（自动匹配模拟/实盘），60秒缓存"""
         global _price_cache, _price_cache_time
-        if _price_cache and time.time() - _price_cache_time < 60:
+        if _price_cache and time.time() - _price_cache_time < 5:
             return _price_cache
         result = {"btc": {}, "eth": {}}
         _headers = {"User-Agent": "Mozilla/5.0"}
