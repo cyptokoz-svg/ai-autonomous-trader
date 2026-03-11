@@ -57,6 +57,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_today())
         elif path == "/api/prices":
             self._json_response(self._get_prices())
+        elif path == "/api/calendar":
+            self._json_response(self._get_calendar())
         elif path == "/api/mode":
             self._json_response({"demo": OKX_DEMO})
         elif path == "/" or path == "/index.html":
@@ -173,11 +175,40 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             "rounds": rounds,
         }
 
+    def _get_calendar(self):
+        """每日PnL热力图数据：最近90天"""
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT date(timestamp) as day, COUNT(*) as trades, "
+            "SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins, "
+            "SUM(pnl) as pnl "
+            "FROM trades WHERE status='closed' "
+            "GROUP BY date(timestamp) ORDER BY day"
+        ).fetchall()
+        # Also get round counts per day
+        rounds = conn.execute(
+            "SELECT date(timestamp) as day, COUNT(*) as rounds "
+            "FROM round_logs GROUP BY date(timestamp)"
+        ).fetchall()
+        conn.close()
+        rounds_map = {r["day"]: r["rounds"] for r in rounds}
+        return [
+            {
+                "date": r["day"],
+                "trades": r["trades"],
+                "wins": r["wins"],
+                "pnl": round(r["pnl"] or 0, 2),
+                "rounds": rounds_map.get(r["day"], 0),
+            }
+            for r in rows
+        ]
+
     def _get_recent_reasoning(self):
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT id, timestamp, coin, side, reasoning, market_state, indicators_used, lessons "
+            "SELECT id, timestamp, coin, side, reasoning, market_state, indicators_used, lessons, status, pnl "
             "FROM trades ORDER BY id DESC LIMIT 5"
         ).fetchall()
         conn.close()
@@ -188,10 +219,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 d["reasoning"] = json.loads(d["reasoning"]) if d["reasoning"] else {}
             except (json.JSONDecodeError, TypeError):
                 d["reasoning"] = {}
-            try:
-                d["indicators_used"] = json.loads(d["indicators_used"]) if d["indicators_used"] else []
-            except (json.JSONDecodeError, TypeError):
-                d["indicators_used"] = []
+            # indicators_used is a plain string like "EMA+MACD+RSI"
+            d["indicators_used"] = d.get("indicators_used") or ""
             result.append(d)
         return result
 

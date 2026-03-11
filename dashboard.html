@@ -423,6 +423,17 @@
   .round-action.close { color: var(--yellow); }
   .round-action.review { color: var(--purple); }
   .round-summary { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .round-coin {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--yellow);
+    background: var(--yellow-bg);
+    padding: 0 5px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
   .round-prices {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.85em;
@@ -502,10 +513,11 @@
   .badge-open { background: var(--blue-bg); color: var(--blue); }
 
   /* ── AI Reasoning ── */
-  .reasoning-scroll { max-height: 360px; overflow-y: auto; }
+  .reasoning-scroll { max-height: 420px; overflow-y: auto; }
   .reasoning-item {
-    padding: 20px 24px;
+    padding: 18px 24px;
     border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
   }
   .reasoning-item:last-child { border-bottom: none; }
   .reasoning-item:hover { background: var(--bg-card-hover); }
@@ -513,32 +525,57 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .reasoning-head .info {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .reasoning-head .time {
     color: var(--text-dim);
     font-size: 0.75em;
+    font-family: 'JetBrains Mono', monospace;
   }
   .reasoning-body {
     font-size: 0.82em;
-    line-height: 1.6;
+    line-height: 1.7;
     color: var(--text-dim);
+    padding-left: 2px;
+    border-left: 2px solid var(--border);
+    padding-left: 12px;
+    margin-left: 2px;
   }
+  .reasoning-body:empty, .reasoning-body:has(> span:only-child) { border-left: none; padding-left: 0; margin-left: 0; }
+  .reasoning-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72em;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .reasoning-status.open { background: var(--blue-bg); color: var(--blue); }
+  .reasoning-status.closed-win { background: var(--green-bg); color: var(--green); }
+  .reasoning-status.closed-loss { background: var(--red-bg); color: var(--red); }
   .field { margin-bottom: 6px; }
   .field-label { color: var(--purple); font-weight: 500; }
-  .indicators-list { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .indicators-list { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
   .indicator-tag {
     background: var(--purple-bg);
     color: var(--purple);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 0.7em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72em;
     font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    border: 1px solid rgba(168,85,247,0.15);
   }
 
   /* ── Tabs ── */
@@ -638,29 +675,41 @@
     border-radius: 8px;
     padding: 16px;
     border-left: 3px solid var(--yellow);
-    transition: background 0.15s;
+    transition: all 0.2s;
   }
-  .signal-item:hover { background: rgba(255,255,255,0.04); }
-  .signal-item .combo { font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--yellow); font-size:0.8em; margin-bottom:4px; }
-  .signal-item .info { font-size:0.75em; color:var(--text-dim); }
+  .signal-item:hover { background: rgba(255,255,255,0.04); transform: translateX(2px); }
+  .signal-item.signal-good { border-left-color: var(--green); }
+  .signal-item.signal-bad { border-left-color: var(--red); }
+  .signal-item .combo { font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--text); font-size:0.82em; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+  .signal-item .combo .wr-badge { font-size:0.85em; font-weight:700; }
+  .signal-item .info { font-size:0.75em; color:var(--text-dim); margin-bottom: 8px; }
+  .signal-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .signal-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease-out; }
   .notes-box {
     padding: 24px;
     font-size: 0.85em;
     line-height: 1.8;
-    white-space: pre-wrap;
     color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
-    max-height: 400px;
+    max-height: 500px;
     overflow-y: auto;
   }
+  .notes-box h1, .notes-box h2, .notes-box h3 { color: var(--text); font-family: 'Manrope', sans-serif; margin: 16px 0 8px; }
+  .notes-box h1 { font-size: 1.1em; color: var(--green); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .notes-box h2 { font-size: 1em; color: var(--blue); }
+  .notes-box h3 { font-size: 0.92em; color: var(--purple); }
+  .notes-box ul, .notes-box ol { padding-left: 20px; margin: 6px 0; }
+  .notes-box li { margin-bottom: 4px; }
+  .notes-box strong { color: var(--text); font-weight: 600; }
+  .notes-box code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
+  .notes-box p { margin: 6px 0; }
 
   /* ── Coin/Side Breakdown ── */
   .breakdown-grid {
     padding: 20px;
     display: grid;
     gap: 12px;
-    max-height: 360px;
     overflow-y: auto;
+    align-content: start;
   }
   .breakdown-item {
     display: flex;
@@ -695,6 +744,121 @@
     transition: width 0.8s ease-out;
     box-shadow: 0 0 6px rgba(0,212,170,0.3);
   }
+
+  /* ── Calendar Heatmap ── */
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .calendar-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .calendar-month {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.9em;
+    min-width: 120px;
+    text-align: center;
+  }
+  .calendar-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 0.75em;
+    color: var(--text-dim);
+  }
+  .cal-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .cal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: 28px repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .cal-weekday {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 4px 0;
+    opacity: 0.6;
+  }
+  .cal-weekday-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    color: var(--text-dim);
+    text-align: right;
+    padding-right: 6px;
+    line-height: 36px;
+    opacity: 0.5;
+  }
+  .cal-cell {
+    aspect-ratio: 1;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    cursor: default;
+    transition: all 0.15s;
+    position: relative;
+    min-height: 36px;
+  }
+  .cal-cell:hover { transform: scale(1.1); z-index: 2; }
+  .cal-cell .cal-day { font-weight: 500; }
+  .cal-cell .cal-pnl { font-size: 0.8em; font-weight: 600; margin-top: 1px; }
+  .cal-empty { background: transparent; }
+  .cal-no-trade { background: rgba(255,255,255,0.02); color: var(--text-dim); opacity: 0.4; }
+  .cal-profit-1 { background: rgba(0,212,170,0.12); color: var(--green); }
+  .cal-profit-2 { background: rgba(0,212,170,0.25); color: var(--green); }
+  .cal-profit-3 { background: rgba(0,212,170,0.4); color: #fff; }
+  .cal-loss-1 { background: rgba(255,71,87,0.12); color: var(--red); }
+  .cal-loss-2 { background: rgba(255,71,87,0.25); color: var(--red); }
+  .cal-loss-3 { background: rgba(255,71,87,0.4); color: #fff; }
+  .cal-today { box-shadow: inset 0 0 0 2px var(--blue); }
+  .cal-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17,17,24,0.95);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .cal-cell:hover .cal-tooltip { opacity: 1; }
+  .calendar-summary {
+    display: flex;
+    gap: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--text-dim);
+    justify-content: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .calendar-summary .cs-val { font-weight: 600; }
 
   /* ── Footer ── */
   .footer {
@@ -806,13 +970,15 @@
   }
   .expand-content {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
     font-size: 0.85em;
-    line-height: 1.6;
+    line-height: 1.7;
     color: var(--text-dim);
+    padding: 4px 0;
   }
   .expand-content .field-label { color: var(--purple); }
+  .expand-content .indicators-list { align-self: start; justify-self: end; }
   .trade-table tbody tr.clickable { cursor: pointer; }
   .trade-table tbody tr.clickable:hover td { background: rgba(74,158,255,0.04); }
 
@@ -1156,19 +1322,19 @@
   </div>
 
   <!-- Row 5: AI Reasoning + Coin/Side Breakdown -->
-  <div class="row row-7-5">
-    <div class="section">
+  <div class="row row-7-5" style="align-items:stretch;">
+    <div class="section" style="display:flex;flex-direction:column;">
       <div class="section-title"><span class="icon icon-purple">*</span> <span data-i18n="secReasoning">AI Reasoning</span></div>
-      <div class="card">
-        <div class="reasoning-scroll" id="reasoningList">
+      <div class="card" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="reasoning-scroll" id="reasoningList" style="flex:1;overflow-y:auto;">
           <div class="empty">Waiting for first trade...</div>
         </div>
       </div>
     </div>
-    <div class="section">
+    <div class="section" style="display:flex;flex-direction:column;">
       <div class="section-title"><span class="icon icon-yellow">%</span> <span data-i18n="secBreakdown">Performance Breakdown</span></div>
-      <div class="card">
-        <div class="breakdown-grid" id="breakdownGrid">
+      <div class="card" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="breakdown-grid" id="breakdownGrid" style="flex:1;overflow-y:auto;">
           <div class="empty">Accumulating data...</div>
         </div>
       </div>
@@ -1255,6 +1421,7 @@ const I18N = {
     sProfitFactor: 'Profit Factor', sTrades: 'Trades', sMaxDD: 'Max DD',
     secEquity: 'Equity Curve', secPositions: 'Open Positions', secRoundLog: 'Round Log',
     secTrades: 'Trade History', secReasoning: 'AI Reasoning', secBreakdown: 'Performance Breakdown',
+    secCalendar: 'Trading Calendar', calNoTrade: 'No trade', calProfit: 'Profit', calLoss: 'Loss',
     secLearning: 'AI Learning Center',
     tabDaily: 'Daily Review', tabWeekly: 'Weekly Review', tabNotes: 'Strategy Notes', tabSignals: 'Signals',
     thTime: 'Time', thCoin: 'Coin', thSide: 'Side', thEntry: 'Entry', thExit: 'Exit',
@@ -1281,6 +1448,7 @@ const I18N = {
     sProfitFactor: '盈亏因子', sTrades: '交易次数', sMaxDD: '最大回撤',
     secEquity: '权益曲线', secPositions: '当前持仓', secRoundLog: '轮次日志',
     secTrades: '交易历史', secReasoning: 'AI 决策推理', secBreakdown: '绩效分析',
+    secCalendar: '交易日历', calNoTrade: '无交易', calProfit: '盈利', calLoss: '亏损',
     secLearning: 'AI 学习中心',
     tabDaily: '每日复盘', tabWeekly: '每周复盘', tabNotes: '策略笔记', tabSignals: '信号统计',
     thTime: '时间', thCoin: '币种', thSide: '方向', thEntry: '入场价', thExit: '出场价',
@@ -1582,11 +1750,12 @@ async function loadRounds() {
     const summary = r.summary || '--';
     const market = r.market_snapshot || '';
     const detail = market ? `${summary}\n\n${market}` : summary;
+    const coinLabel = r.coin ? `<span class="round-coin">${r.coin.replace('-USDT-SWAP','')}</span>` : '';
     return `<div class="round-item" onclick="this.classList.toggle('expanded')">
       <div class="round-row">
         <div class="round-time">${time}</div>
         <div class="round-action ${cls}">${r.action.toUpperCase()}</div>
-        <div class="round-summary">${summary} <span class="round-expand">▶</span></div>
+        <div class="round-summary">${coinLabel}${summary} <span class="round-expand">▶</span></div>
         <div class="round-prices">${prices}</div>
       </div>
       <div class="round-detail">${detail}</div>
@@ -1632,18 +1801,24 @@ async function loadTrades() {
     // Parse reasoning for expand
     let reasoning = {};
     try { reasoning = typeof t.reasoning === 'string' ? JSON.parse(t.reasoning) : (t.reasoning || {}); } catch(e) {}
-    let indicators = [];
-    try { indicators = typeof t.indicators_used === 'string' ? JSON.parse(t.indicators_used) : (t.indicators_used || []); } catch(e) {}
+    // indicators_used is a plain string like "EMA+MACD+RSI"
+    const indicators = typeof t.indicators_used === 'string' ? t.indicators_used.split('+').filter(Boolean) : [];
 
     let expandHtml = '';
-    if (reasoning.why_this_action || reasoning.market_state || t.lessons) {
+    const hasReasoning = Object.keys(reasoning).length > 0 || t.lessons;
+    if (hasReasoning) {
+      let fields = '';
+      if (reasoning.market_state) fields += `<div class="field"><span class="field-label">市场状态:</span> ${reasoning.market_state}</div>`;
+      if (reasoning.direction) fields += `<div class="field"><span class="field-label">方向判断:</span> ${reasoning.direction}</div>`;
+      if (reasoning.trigger) fields += `<div class="field"><span class="field-label">入场信号:</span> ${reasoning.trigger}</div>`;
+      if (reasoning.risk) fields += `<div class="field"><span class="field-label">风控:</span> ${reasoning.risk}</div>`;
+      if (reasoning.concern) fields += `<div class="field"><span class="field-label">顾虑:</span> ${reasoning.concern}</div>`;
+      if (reasoning.why_hold) fields += `<div class="field"><span class="field-label">观望原因:</span> ${reasoning.why_hold}</div>`;
+      if (reasoning.watching) fields += `<div class="field"><span class="field-label">关注中:</span> ${reasoning.watching}</div>`;
+      if (t.lessons) fields += `<div class="field"><span class="field-label">经验教训:</span> ${t.lessons}</div>`;
       expandHtml = `<tr class="trade-expand" id="expand-${t.id}"><td colspan="12"><div class="expand-content">
-        <div>${reasoning.market_state ? `<div class="field"><span class="field-label">Market:</span> ${reasoning.market_state}</div>` : ''}
-        ${reasoning.why_this_action ? `<div class="field"><span class="field-label">Reason:</span> ${reasoning.why_this_action}</div>` : ''}
-        ${reasoning.why_this_sl ? `<div class="field"><span class="field-label">SL:</span> ${reasoning.why_this_sl}</div>` : ''}</div>
-        <div>${reasoning.what_could_go_wrong ? `<div class="field"><span class="field-label">Risk:</span> ${reasoning.what_could_go_wrong}</div>` : ''}
-        ${t.lessons ? `<div class="field"><span class="field-label">Lesson:</span> ${t.lessons}</div>` : ''}
-        ${indicators.length ? `<div class="indicators-list">${indicators.map(i=>`<span class="indicator-tag">${i}</span>`).join('')}</div>` : ''}</div>
+        <div>${fields}</div>
+        ${indicators.length ? `<div class="indicators-list">${indicators.map(i=>`<span class="indicator-tag">${i}</span>`).join('')}</div>` : ''}
       </div></td></tr>`;
     }
 
@@ -1688,24 +1863,38 @@ async function loadReasoning() {
   }
   el.innerHTML = data.map(tr => {
     const r = tr.reasoning || {};
-    const side = tr.side === 'buy' ? 'LONG' : 'SHORT';
-    const cls = tr.side === 'buy' ? 'badge-long' : 'badge-short';
+    const sideMap = { buy: 'LONG', sell: 'SHORT', long: 'LONG', short: 'SHORT' };
+    const side = sideMap[(tr.side||'').toLowerCase()] || (tr.status === 'open' ? 'OPEN' : '');
+    const clsMap = { LONG: 'badge-long', SHORT: 'badge-short' };
+    const cls = clsMap[side] || 'badge-open';
     const coin = (tr.coin||'').replace('-USDT-SWAP','');
-    const indicators = tr.indicators_used || [];
+    // indicators_used is a plain string "EMA+MACD+RSI"
+    const indicators = typeof tr.indicators_used === 'string' ? tr.indicators_used.split('+').filter(Boolean) : [];
+    const pnlStr = tr.pnl != null && tr.status === 'closed' ? ` <span class="${tr.pnl>=0?'positive':'negative'}">${tr.pnl>=0?'+':''}${tr.pnl.toFixed(1)}</span>` : '';
 
     let body = '';
-    if (r.market_state) body += `<div class="field"><span class="field-label">Market:</span> ${r.market_state}</div>`;
-    if (r.why_this_action) body += `<div class="field"><span class="field-label">Reason:</span> ${r.why_this_action}</div>`;
-    if (r.why_this_sl) body += `<div class="field"><span class="field-label">SL Logic:</span> ${r.why_this_sl}</div>`;
-    if (r.what_could_go_wrong) body += `<div class="field"><span class="field-label">Risk:</span> ${r.what_could_go_wrong}</div>`;
-    if (tr.lessons) body += `<div class="field"><span class="field-label">Lesson:</span> ${tr.lessons}</div>`;
+    // Match actual AI reasoning format from ai-trader-prompt.md
+    if (r.market_state) body += `<div class="field"><span class="field-label">市场状态:</span> ${r.market_state}</div>`;
+    if (r.direction) body += `<div class="field"><span class="field-label">方向判断:</span> ${r.direction}</div>`;
+    if (r.trigger) body += `<div class="field"><span class="field-label">入场信号:</span> ${r.trigger}</div>`;
+    if (r.risk) body += `<div class="field"><span class="field-label">风控:</span> ${r.risk}</div>`;
+    if (r.concern) body += `<div class="field"><span class="field-label">顾虑:</span> ${r.concern}</div>`;
+    if (r.why_hold) body += `<div class="field"><span class="field-label">观望原因:</span> ${r.why_hold}</div>`;
+    if (r.watching) body += `<div class="field"><span class="field-label">关注中:</span> ${r.watching}</div>`;
+    if (tr.lessons) body += `<div class="field"><span class="field-label">经验教训:</span> ${tr.lessons}</div>`;
+
+    // Status badge
+    let statusHtml = '';
+    if (tr.status === 'open') statusHtml = '<span class="reasoning-status open">OPEN</span>';
+    else if (tr.status === 'closed' && tr.pnl >= 0) statusHtml = `<span class="reasoning-status closed-win">+${tr.pnl.toFixed(1)}</span>`;
+    else if (tr.status === 'closed') statusHtml = `<span class="reasoning-status closed-loss">${tr.pnl.toFixed(1)}</span>`;
 
     return `<div class="reasoning-item">
       <div class="reasoning-head">
-        <div class="info">#${tr.id} ${coin} <span class="badge ${cls}">${side}</span></div>
+        <div class="info">#${tr.id} ${coin} <span class="badge ${cls}">${side}</span> ${statusHtml}</div>
         <div class="time">${fmtTime(tr.timestamp)}</div>
       </div>
-      <div class="reasoning-body">${body || '<span style="color:var(--text-dim)">No reasoning recorded</span>'}</div>
+      <div class="reasoning-body">${body || '<span style="color:var(--text-dim)">无推理记录</span>'}</div>
       ${indicators.length ? `<div class="indicators-list">${indicators.map(i=>`<span class="indicator-tag">${i}</span>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
@@ -1800,20 +1989,45 @@ async function loadSignals() {
     return;
   }
   document.getElementById('signalCount').textContent = data.length;
-  el.innerHTML = data.map(s => {
+  // Sort by win rate then by usage
+  const sorted = [...data].sort((a,b) => {
+    const wrA = a.used_count > 0 ? a.win_count/a.used_count : 0;
+    const wrB = b.used_count > 0 ? b.win_count/b.used_count : 0;
+    return wrB - wrA || b.used_count - a.used_count;
+  });
+  el.innerHTML = sorted.map(s => {
     const wr = s.used_count > 0 ? (s.win_count/s.used_count*100) : 0;
     const wrCls = wr >= 50 ? 'positive' : 'negative';
-    return `<div class="signal-item">
-      <div class="combo">${s.indicator_combo}</div>
-      <div class="info">${s.used_count}x · WR <span class="${wrCls}">${fmt(wr,0)}%</span> · PnL <span class="${s.total_pnl>=0?'positive':'negative'}">${fmtPnl(s.total_pnl)}</span></div>
+    const itemCls = wr >= 50 ? 'signal-good' : wr < 40 ? 'signal-bad' : '';
+    const barColor = wr >= 50 ? 'var(--green)' : wr >= 40 ? 'var(--yellow)' : 'var(--red)';
+    return `<div class="signal-item ${itemCls}">
+      <div class="combo"><span>${s.indicator_combo}</span> <span class="wr-badge ${wrCls}">${fmt(wr,0)}%</span></div>
+      <div class="info">${s.used_count} trades · ${s.win_count}W/${s.used_count-s.win_count}L · PnL <span class="${s.total_pnl>=0?'positive':'negative'}">${fmtPnl(s.total_pnl)}</span></div>
+      <div class="signal-bar"><div class="signal-bar-fill" style="width:${wr}%;background:${barColor}"></div></div>
     </div>`;
   }).join('');
 }
 
 // ── Notes ──
+function renderMarkdown(text) {
+  // Simple markdown: headers, bold, lists, code
+  return text
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+}
+
 async function loadNotes() {
   const data = await fetchJSON('/api/strategy-notes');
-  if (data && data.content) document.getElementById('strategyNotes').textContent = data.content;
+  if (data && data.content) {
+    document.getElementById('strategyNotes').innerHTML = renderMarkdown(data.content);
+  }
 }
 
 // ── Chart ──
@@ -1987,6 +2201,108 @@ async function loadTicker() {
 
   // Refresh open positions with new prices
   if (lastOpenData.length) renderPositions(lastOpenData);
+}
+
+// ── Calendar Heatmap ──
+let calendarData = [];
+let calendarViewDate = new Date();
+
+function calendarNav(dir) {
+  calendarViewDate.setMonth(calendarViewDate.getMonth() + dir);
+  renderCalendar();
+}
+
+async function loadCalendar() {
+  calendarData = await fetchJSON('/api/calendar') || [];
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  const monthNames = currentLang === 'zh'
+    ? ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
+    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('calendarMonth').textContent = `${year} ${monthNames[month]}`;
+
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // Build data map
+  const dataMap = {};
+  calendarData.forEach(d => { dataMap[d.date] = d; });
+
+  // Weekday headers
+  const weekdays = currentLang === 'zh' ? ['日','一','二','三','四','五','六'] : ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  let html = '<div class="cal-weekday-label"></div>'; // empty corner
+  weekdays.forEach(w => { html += `<div class="cal-weekday">${w}</div>`; });
+
+  // Calendar cells
+  let monthPnl = 0, monthTrades = 0, monthWins = 0, tradingDays = 0;
+  let dayCount = 0;
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+
+  for (let i = 0; i < totalCells; i++) {
+    // Row label (week day name) at start of each row
+    if (i % 7 === 0) {
+      const weekNum = Math.floor(i / 7) + 1;
+      html += `<div class="cal-weekday-label">W${weekNum}</div>`;
+    }
+
+    const dayNum = i - firstDay + 1;
+    if (dayNum < 1 || dayNum > daysInMonth) {
+      html += '<div class="cal-cell cal-empty"></div>';
+      continue;
+    }
+
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
+    const d = dataMap[dateStr];
+    const isToday = dateStr === todayStr;
+    let cls = 'cal-no-trade';
+    let pnlHtml = '';
+    let tooltipHtml = '';
+
+    if (d) {
+      tradingDays++;
+      monthPnl += d.pnl;
+      monthTrades += d.trades;
+      monthWins += d.wins;
+      const absPnl = Math.abs(d.pnl);
+      if (d.pnl > 0) {
+        cls = absPnl > 100 ? 'cal-profit-3' : absPnl > 30 ? 'cal-profit-2' : 'cal-profit-1';
+      } else {
+        cls = absPnl > 100 ? 'cal-loss-3' : absPnl > 30 ? 'cal-loss-2' : 'cal-loss-1';
+      }
+      pnlHtml = `<div class="cal-pnl">${d.pnl >= 0 ? '+' : ''}${d.pnl.toFixed(0)}</div>`;
+      tooltipHtml = `<div class="cal-tooltip">
+        <div style="color:var(--text);font-weight:600">${dateStr}</div>
+        <div>PnL: <span class="${d.pnl>=0?'positive':'negative'}">${d.pnl>=0?'+':''}$${d.pnl.toFixed(2)}</span></div>
+        <div>${d.trades} trades · ${d.wins}W/${d.trades-d.wins}L</div>
+        ${d.rounds ? `<div>${d.rounds} rounds</div>` : ''}
+      </div>`;
+    }
+
+    html += `<div class="cal-cell ${cls} ${isToday ? 'cal-today' : ''}">
+      <div class="cal-day">${dayNum}</div>
+      ${pnlHtml}
+      ${tooltipHtml}
+    </div>`;
+  }
+
+  grid.innerHTML = html;
+
+  // Summary
+  const wr = monthTrades > 0 ? (monthWins / monthTrades * 100).toFixed(0) : '--';
+  const summaryEl = document.getElementById('calendarSummary');
+  summaryEl.innerHTML = `
+    <span>${currentLang === 'zh' ? '交易日' : 'Trading days'}: <span class="cs-val">${tradingDays}</span></span>
+    <span>${currentLang === 'zh' ? '总笔数' : 'Trades'}: <span class="cs-val">${monthTrades}</span></span>
+    <span>${currentLang === 'zh' ? '胜率' : 'WR'}: <span class="cs-val">${wr}%</span></span>
+    <span>PnL: <span class="cs-val ${monthPnl>=0?'positive':'negative'}">${monthPnl>=0?'+':''}$${monthPnl.toFixed(2)}</span></span>
+  `;
 }
 
 // ── Last Update ──

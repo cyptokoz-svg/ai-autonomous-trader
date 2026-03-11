@@ -246,6 +246,25 @@ class DataEngine:
             for col in dc.columns:
                 df[col] = dc[col]
 
+        # ── VWAP (日内公允价格) ──
+        typical = (h + l + c) / 3
+        cum_tp_vol = (typical * v).cumsum()
+        cum_vol = v.cumsum()
+        df["vwap"] = cum_tp_vol / cum_vol
+
+        # ── CMF (Chaikin Money Flow, 20期) ──
+        mfv = ((c - l) - (h - c)) / (h - l + 1e-10) * v
+        df["cmf20"] = mfv.rolling(20).sum() / v.rolling(20).sum()
+
+        # ── Pivot Points (日内支撑阻力) ──
+        pp = (h.shift(1) + l.shift(1) + c.shift(1)) / 3
+        df["pivot"] = pp
+        df["pivot_r1"] = 2 * pp - l.shift(1)
+        df["pivot_s1"] = 2 * pp - h.shift(1)
+
+        # ── ROC (Rate of Change, 12期) ──
+        df["roc12"] = ta.roc(c, length=12)
+
         return df
 
     # ──────────────────── Funding Rate ────────────────────
@@ -523,7 +542,7 @@ class DataEngine:
                 if bbp is not None and pd.notna(bbp):
                     lines.append(f"BB: {bbl:.1f}~{bbu:.1f} 位置={bbp:.0%}")
 
-                # OBV + SuperTrend 合并
+                # OBV + SuperTrend + CMF + ROC 合并
                 extras = []
                 if "obv" in last and pd.notna(last["obv"]):
                     extras.append(f"OBV={last['obv']:.0f}")
@@ -535,6 +554,19 @@ class DataEngine:
                     extras.append(f"ST:{direction}{val}")
                 if extras:
                     lines.append(f"{' | '.join(extras)}")
+
+                # VWAP + CMF + ROC + Pivot
+                extra2 = []
+                if "vwap" in last and pd.notna(last["vwap"]):
+                    extra2.append(f"VWAP={last['vwap']:.1f}")
+                if "cmf20" in last and pd.notna(last["cmf20"]):
+                    extra2.append(f"CMF={last['cmf20']:.3f}")
+                if "roc12" in last and pd.notna(last["roc12"]):
+                    extra2.append(f"ROC={last['roc12']:.1f}%")
+                if extra2:
+                    lines.append(f"{' | '.join(extra2)}")
+                if "pivot" in last and pd.notna(last["pivot"]):
+                    lines.append(f"Pivot: S1={last['pivot_s1']:.1f} P={last['pivot']:.1f} R1={last['pivot_r1']:.1f}")
 
                 # 近10根K线 (收盘+高低)
                 recent = df.tail(10)
