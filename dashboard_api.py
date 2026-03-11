@@ -20,7 +20,7 @@ DASH_TOKEN = os.environ.get("DASH_TOKEN", "taoli2")
 _price_cache = {}
 _price_cache_time = 0
 MEMORY_DIR = Path.home() / ".claude/projects/-Users-crypto/memory"
-PORT = 8888
+PORT = int(os.environ.get("PORT", 8888))
 
 
 class DashboardHandler(SimpleHTTPRequestHandler):
