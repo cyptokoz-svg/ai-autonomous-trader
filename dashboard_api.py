@@ -74,7 +74,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _json_response(self, data):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "http://localhost:8888")
+        origin = self.headers.get("Origin", "")
+        allowed = origin if origin else "*"
+        self.send_header("Access-Control-Allow-Origin", allowed)
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False, default=str).encode())
 
@@ -244,5 +246,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"Dashboard running at http://localhost:{PORT}")
-    server = HTTPServer(("127.0.0.1", PORT), DashboardHandler)
+    import os
+    bind = os.environ.get("DASH_BIND", "127.0.0.1")
+    server = HTTPServer((bind, PORT), DashboardHandler)
     server.serve_forever()
