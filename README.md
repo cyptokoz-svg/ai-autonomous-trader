@@ -41,7 +41,6 @@ AI 驱动的加密货币自主交易系统，专注 BTC/ETH 永续合约。基�
 | `risk_check.py` | 风控硬检查：铁律不可被 AI 绕过 |
 | `stats.py` | 统计报告生成 |
 | `config.py` | 全局配置：交易对、时间框架、EMA 参数 |
-| `ai_config.py` | AI 模型配置：多供应商统一接口 |
 | `trigger.md` | AI 触发 Prompt：每轮执行流程 |
 | `ai-trader-prompt.md` | AI 分析决策 Prompt：交易逻辑核心 |
 
@@ -82,44 +81,7 @@ demo = false
 
 > **API Key 存放在 `~/.okx/config.toml`，不在项目目录内，不会被提交。**
 
-### 4. 配置 AI 模型（可选）
-
-在 `~/.okx/config.toml` 中添加 `[ai]` 段：
-
-```toml
-[ai]
-provider = "anthropic"          # 见下方支持列表
-model = "claude-sonnet-4-6"     # 可选，不填用默认
-api_key = "sk-xxx"              # 或用环境变量
-# base_url = ""                 # 自定义 API 地址（可选）
-```
-
-**支持的 AI 供应商：**
-
-| Provider | 名称 | 默认模型 | 环境变量 |
-|----------|------|----------|----------|
-| `anthropic` | Anthropic (Claude) | claude-sonnet-4-6 | `ANTHROPIC_API_KEY` |
-| `openai` | OpenAI (GPT) | gpt-4o | `OPENAI_API_KEY` |
-| `google` | Google (Gemini) | gemini-2.5-flash | `GOOGLE_API_KEY` |
-| `deepseek` | DeepSeek | deepseek-chat | `DEEPSEEK_API_KEY` |
-| `groq` | Groq | llama-3.3-70b | `GROQ_API_KEY` |
-| `openrouter` | OpenRouter (聚合) | claude-sonnet-4 | `OPENROUTER_API_KEY` |
-| `xai` | xAI (Grok) | grok-3-mini | `XAI_API_KEY` |
-
-也可以通过环境变量配置：
-
-```bash
-export AI_PROVIDER=deepseek
-export DEEPSEEK_API_KEY=sk-xxx
-```
-
-查看当前配置：
-
-```bash
-python3 ai_config.py
-```
-
-### 5. 启动 Dashboard
+### 4. 启动 Dashboard
 
 ```bash
 python3 dashboard_api.py
@@ -127,13 +89,13 @@ python3 dashboard_api.py
 
 打开 http://localhost:8888 查看仪表盘。
 
-### 6. 运行数据引擎（测试）
+### 5. 运行数据引擎（测试）
 
 ```bash
 python3 data_engine.py
 ```
 
-### 7. 安装 OKX MCP（Claude Code 交易接口）
+### 6. 安装 OKX MCP（Claude Code 交易接口）
 
 本项目通过 [OKX Agent Trade Kit](https://github.com/anthropics/anthropic-quickstarts/tree/main/okx-trade) 的 MCP 协议让 Claude Code 直接操作 OKX 交易所。
 
@@ -163,7 +125,7 @@ npm install okx-trade-mcp
 
 OKX API 凭证需配置在 `~/.okx/config.toml`（见步骤 3）。
 
-### 8. 配合 Claude Code 自动交易
+### 7. 配合 Claude Code 自动交易
 
 使用 [Claude Code](https://claude.ai) 实现自主交易循环：
 
