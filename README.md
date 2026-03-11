@@ -94,12 +94,44 @@ python3 dashboard_api.py
 python3 data_engine.py
 ```
 
-### 6. 配合 Claude Code 自动交易
+### 6. 安装 OKX MCP（Claude Code 交易接口）
 
-使用 [Claude Code](https://claude.ai) + [OKX MCP](https://github.com/okx/agent-trade-kit) 实现自主交易循环：
+本项目通过 [OKX Agent Trade Kit](https://github.com/anthropics/anthropic-quickstarts/tree/main/okx-trade) 的 MCP 协议让 Claude Code 直接操作 OKX 交易所。
+
+```bash
+# 创建 MCP 工作目录并安装
+mkdir -p ~/Desktop/okx-trade && cd ~/Desktop/okx-trade
+npm init -y
+npm install okx-trade-mcp
+```
+
+配置 Claude Code MCP（编辑 `~/.claude/mcp.json`）：
+
+```json
+{
+  "mcpServers": {
+    "okx": {
+      "command": "npx",
+      "args": ["okx-trade-mcp", "--demo", "--modules", "swap,account,market"],
+      "cwd": "/path/to/okx-trade"
+    }
+  }
+}
+```
+
+> **模拟盘**: 使用 `--demo` 参数
+> **实盘**: 去掉 `--demo` 参数
+
+OKX API 凭证需配置在 `~/.okx/config.toml`（见步骤 3）。
+
+### 7. 配合 Claude Code 自动交易
+
+使用 [Claude Code](https://claude.ai) 实现自主交易循环：
 
 ```bash
 # 每 30 分钟由 cron 触发 Claude Code，执行 trigger.md 中的完整流程
+# 示例 crontab:
+*/30 * * * * cd ~/Desktop/ai-autonomous-trader && claude -p trigger.md
 ```
 
 ## 风控铁律
