@@ -770,96 +770,6 @@
     font-size: 0.75em;
     color: var(--text-dim);
   }
-  .cal-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .cal-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    display: inline-block;
-  }
-  .calendar-grid {
-    display: grid;
-    grid-template-columns: 28px repeat(7, 1fr);
-    gap: 4px;
-    margin-bottom: 12px;
-  }
-  .cal-weekday {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65em;
-    color: var(--text-dim);
-    text-align: center;
-    padding: 4px 0;
-    opacity: 0.6;
-  }
-  .cal-weekday-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.6em;
-    color: var(--text-dim);
-    text-align: right;
-    padding-right: 6px;
-    line-height: 36px;
-    opacity: 0.5;
-  }
-  .cal-cell {
-    aspect-ratio: 1;
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72em;
-    cursor: default;
-    transition: all 0.15s;
-    position: relative;
-    min-height: 36px;
-  }
-  .cal-cell:hover { transform: scale(1.1); z-index: 2; }
-  .cal-cell .cal-day { font-weight: 500; }
-  .cal-cell .cal-pnl { font-size: 0.8em; font-weight: 600; margin-top: 1px; }
-  .cal-empty { background: transparent; }
-  .cal-no-trade { background: rgba(255,255,255,0.02); color: var(--text-dim); opacity: 0.4; }
-  .cal-profit-1 { background: rgba(0,212,170,0.12); color: var(--green); }
-  .cal-profit-2 { background: rgba(0,212,170,0.25); color: var(--green); }
-  .cal-profit-3 { background: rgba(0,212,170,0.4); color: #fff; }
-  .cal-loss-1 { background: rgba(255,71,87,0.12); color: var(--red); }
-  .cal-loss-2 { background: rgba(255,71,87,0.25); color: var(--red); }
-  .cal-loss-3 { background: rgba(255,71,87,0.4); color: #fff; }
-  .cal-today { box-shadow: inset 0 0 0 2px var(--blue); }
-  .cal-tooltip {
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(17,17,24,0.95);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 0.85em;
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  }
-  .cal-cell:hover .cal-tooltip { opacity: 1; }
-  .calendar-summary {
-    display: flex;
-    gap: 24px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78em;
-    color: var(--text-dim);
-    justify-content: center;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-  }
-  .calendar-summary .cs-val { font-weight: 600; }
-
   /* ── Footer ── */
   .footer {
     text-align: center;
@@ -1499,6 +1409,13 @@ async function fetchJSON(path) {
   catch(e) { console.error('API error:', path, e); return null; }
 }
 
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 function fmt(n, dec=2) {
   if (n == null || isNaN(n)) return '--';
   return Number(n).toFixed(dec);
@@ -1524,7 +1441,7 @@ function fmtDuration(min) {
 
 // ── Count-up Animation ──
 function countUp(el, target, prefix='', suffix='', dec=2) {
-  if (isNaN(target)) { el.textContent = `${prefix}${target}${suffix}`; return; }
+  if (isNaN(target) || !isFinite(target)) { el.textContent = '--'; return; }
   const prev = parseFloat(el.dataset.countVal);
   const start = isNaN(prev) ? 0 : prev;
   if (start === target) return;
@@ -1622,7 +1539,7 @@ function loadBreakdown(s) {
       const name = coin.replace('-USDT-SWAP','');
       const wr = d.total > 0 ? (d.wins / d.total * 100) : 0;
       const wrCls = wr >= 50 ? 'positive' : 'negative';
-      const pnlCls = d.pnl >= 0 ? 'positive' : 'negative';
+      const pnlCls = (d.pnl ?? 0) >= 0 ? 'positive' : 'negative';
       html += `<div class="breakdown-item">
         <div class="bd-label">${name}</div>
         <div class="bd-stats">
@@ -1641,7 +1558,7 @@ function loadBreakdown(s) {
       const label = side === 'buy' ? 'LONG' : side === 'sell' ? 'SHORT' : side.toUpperCase();
       const wr = d.total > 0 ? (d.wins / d.total * 100) : 0;
       const wrCls = wr >= 50 ? 'positive' : 'negative';
-      const pnlCls = d.pnl >= 0 ? 'positive' : 'negative';
+      const pnlCls = (d.pnl ?? 0) >= 0 ? 'positive' : 'negative';
       html += `<div class="breakdown-item">
         <div class="bd-label">${label}</div>
         <div class="bd-stats">
@@ -1694,7 +1611,7 @@ function renderPositions(open) {
       const dir = isLong ? 1 : -1;
       const ctVal = key === 'btc' ? 0.01 : 0.1;
       const pnl = dir * (livePrice - t.entry_price) * (t.sheets || 1) * ctVal;
-      const pnlPct = dir * (livePrice - t.entry_price) / t.entry_price * t.leverage * 100;
+      const pnlPct = dir * (livePrice - t.entry_price) / t.entry_price * (t.leverage || 1) * 100;
       pnlCls = pnl >= 0 ? 'positive' : 'negative';
       pnlStr = fmtPnl(pnl);
       pnlPctStr = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`;
@@ -1747,8 +1664,8 @@ async function loadRounds() {
     const prices = (r.btc_price || r.eth_price)
       ? `B:${r.btc_price?Number(r.btc_price).toFixed(0):'--'} E:${r.eth_price?Number(r.eth_price).toFixed(1):'--'}`
       : '';
-    const summary = r.summary || '--';
-    const market = r.market_snapshot || '';
+    const summary = esc(r.summary) || '--';
+    const market = esc(r.market_snapshot) || '';
     const detail = market ? `${summary}\n\n${market}` : summary;
     const coinLabel = r.coin ? `<span class="round-coin">${r.coin.replace('-USDT-SWAP','')}</span>` : '';
     return `<div class="round-item" onclick="this.classList.toggle('expanded')">
@@ -1874,14 +1791,14 @@ async function loadReasoning() {
 
     let body = '';
     // Match actual AI reasoning format from ai-trader-prompt.md
-    if (r.market_state) body += `<div class="field"><span class="field-label">市场状态:</span> ${r.market_state}</div>`;
-    if (r.direction) body += `<div class="field"><span class="field-label">方向判断:</span> ${r.direction}</div>`;
-    if (r.trigger) body += `<div class="field"><span class="field-label">入场信号:</span> ${r.trigger}</div>`;
-    if (r.risk) body += `<div class="field"><span class="field-label">风控:</span> ${r.risk}</div>`;
-    if (r.concern) body += `<div class="field"><span class="field-label">顾虑:</span> ${r.concern}</div>`;
-    if (r.why_hold) body += `<div class="field"><span class="field-label">观望原因:</span> ${r.why_hold}</div>`;
-    if (r.watching) body += `<div class="field"><span class="field-label">关注中:</span> ${r.watching}</div>`;
-    if (tr.lessons) body += `<div class="field"><span class="field-label">经验教训:</span> ${tr.lessons}</div>`;
+    if (r.market_state) body += `<div class="field"><span class="field-label">市场状态:</span> ${esc(r.market_state)}</div>`;
+    if (r.direction) body += `<div class="field"><span class="field-label">方向判断:</span> ${esc(r.direction)}</div>`;
+    if (r.trigger) body += `<div class="field"><span class="field-label">入场信号:</span> ${esc(r.trigger)}</div>`;
+    if (r.risk) body += `<div class="field"><span class="field-label">风控:</span> ${esc(r.risk)}</div>`;
+    if (r.concern) body += `<div class="field"><span class="field-label">顾虑:</span> ${esc(r.concern)}</div>`;
+    if (r.why_hold) body += `<div class="field"><span class="field-label">观望原因:</span> ${esc(r.why_hold)}</div>`;
+    if (r.watching) body += `<div class="field"><span class="field-label">关注中:</span> ${esc(r.watching)}</div>`;
+    if (tr.lessons) body += `<div class="field"><span class="field-label">经验教训:</span> ${esc(tr.lessons)}</div>`;
 
     // Status badge
     let statusHtml = '';
@@ -1923,8 +1840,8 @@ function renderReviewItems(items) {
         <span class="review-type ${cls}">${label}</span>
         <span class="review-time">${fmtTime(r.timestamp)}</span>
       </div>
-      <div class="review-body">${r.content || ''}</div>
-      ${r.key_findings ? `<div class="review-findings">${r.key_findings}</div>` : ''}
+      <div class="review-body">${esc(r.content)}</div>
+      ${r.key_findings ? `<div class="review-findings">${esc(r.key_findings)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -2010,8 +1927,9 @@ async function loadSignals() {
 
 // ── Notes ──
 function renderMarkdown(text) {
-  // Simple markdown: headers, bold, lists, code
-  return text
+  // Escape HTML first to prevent XSS, then apply markdown formatting
+  const safe = esc(text);
+  return safe
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -2050,11 +1968,15 @@ async function loadChart() {
   const pts = [{x:0, y:eq, trade:null}];
   trades.forEach((t,i) => { eq += (t.pnl||0); pts.push({x:i+1, y:eq, trade:t}); });
 
-  const minY = Math.min(...pts.map(p=>p.y)) * 0.998;
-  const maxY = Math.max(...pts.map(p=>p.y)) * 1.002;
+  let minY = Math.min(...pts.map(p=>p.y));
+  let maxY = Math.max(...pts.map(p=>p.y));
+  if (minY === maxY) { minY -= 1; maxY += 1; }
+  minY *= 0.998; maxY *= 1.002;
   const w = canvas.width, h = canvas.height, pad = 10;
-  const sx = x => pad + (x/(pts.length-1)) * (w-pad*2);
-  const sy = y => h-pad - ((y-minY)/(maxY-minY)) * (h-pad*2);
+  const denom = pts.length > 1 ? pts.length - 1 : 1;
+  const sx = x => pad + (x/denom) * (w-pad*2);
+  const rangeY = maxY - minY || 1;
+  const sy = y => h-pad - ((y-minY)/rangeY) * (h-pad*2);
 
   // Save for hover
   chartData = { pts, trades, sx, sy, w, h, pad };
@@ -2203,107 +2125,7 @@ async function loadTicker() {
   if (lastOpenData.length) renderPositions(lastOpenData);
 }
 
-// ── Calendar Heatmap ──
-let calendarData = [];
-let calendarViewDate = new Date();
-
-function calendarNav(dir) {
-  calendarViewDate.setMonth(calendarViewDate.getMonth() + dir);
-  renderCalendar();
-}
-
-async function loadCalendar() {
-  calendarData = await fetchJSON('/api/calendar') || [];
-  renderCalendar();
-}
-
-function renderCalendar() {
-  const grid = document.getElementById('calendarGrid');
-  const year = calendarViewDate.getFullYear();
-  const month = calendarViewDate.getMonth();
-  const monthNames = currentLang === 'zh'
-    ? ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
-    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('calendarMonth').textContent = `${year} ${monthNames[month]}`;
-
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-
-  // Build data map
-  const dataMap = {};
-  calendarData.forEach(d => { dataMap[d.date] = d; });
-
-  // Weekday headers
-  const weekdays = currentLang === 'zh' ? ['日','一','二','三','四','五','六'] : ['Su','Mo','Tu','We','Th','Fr','Sa'];
-  let html = '<div class="cal-weekday-label"></div>'; // empty corner
-  weekdays.forEach(w => { html += `<div class="cal-weekday">${w}</div>`; });
-
-  // Calendar cells
-  let monthPnl = 0, monthTrades = 0, monthWins = 0, tradingDays = 0;
-  let dayCount = 0;
-  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
-
-  for (let i = 0; i < totalCells; i++) {
-    // Row label (week day name) at start of each row
-    if (i % 7 === 0) {
-      const weekNum = Math.floor(i / 7) + 1;
-      html += `<div class="cal-weekday-label">W${weekNum}</div>`;
-    }
-
-    const dayNum = i - firstDay + 1;
-    if (dayNum < 1 || dayNum > daysInMonth) {
-      html += '<div class="cal-cell cal-empty"></div>';
-      continue;
-    }
-
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
-    const d = dataMap[dateStr];
-    const isToday = dateStr === todayStr;
-    let cls = 'cal-no-trade';
-    let pnlHtml = '';
-    let tooltipHtml = '';
-
-    if (d) {
-      tradingDays++;
-      monthPnl += d.pnl;
-      monthTrades += d.trades;
-      monthWins += d.wins;
-      const absPnl = Math.abs(d.pnl);
-      if (d.pnl > 0) {
-        cls = absPnl > 100 ? 'cal-profit-3' : absPnl > 30 ? 'cal-profit-2' : 'cal-profit-1';
-      } else {
-        cls = absPnl > 100 ? 'cal-loss-3' : absPnl > 30 ? 'cal-loss-2' : 'cal-loss-1';
-      }
-      pnlHtml = `<div class="cal-pnl">${d.pnl >= 0 ? '+' : ''}${d.pnl.toFixed(0)}</div>`;
-      tooltipHtml = `<div class="cal-tooltip">
-        <div style="color:var(--text);font-weight:600">${dateStr}</div>
-        <div>PnL: <span class="${d.pnl>=0?'positive':'negative'}">${d.pnl>=0?'+':''}$${d.pnl.toFixed(2)}</span></div>
-        <div>${d.trades} trades · ${d.wins}W/${d.trades-d.wins}L</div>
-        ${d.rounds ? `<div>${d.rounds} rounds</div>` : ''}
-      </div>`;
-    }
-
-    html += `<div class="cal-cell ${cls} ${isToday ? 'cal-today' : ''}">
-      <div class="cal-day">${dayNum}</div>
-      ${pnlHtml}
-      ${tooltipHtml}
-    </div>`;
-  }
-
-  grid.innerHTML = html;
-
-  // Summary
-  const wr = monthTrades > 0 ? (monthWins / monthTrades * 100).toFixed(0) : '--';
-  const summaryEl = document.getElementById('calendarSummary');
-  summaryEl.innerHTML = `
-    <span>${currentLang === 'zh' ? '交易日' : 'Trading days'}: <span class="cs-val">${tradingDays}</span></span>
-    <span>${currentLang === 'zh' ? '总笔数' : 'Trades'}: <span class="cs-val">${monthTrades}</span></span>
-    <span>${currentLang === 'zh' ? '胜率' : 'WR'}: <span class="cs-val">${wr}%</span></span>
-    <span>PnL: <span class="cs-val ${monthPnl>=0?'positive':'negative'}">${monthPnl>=0?'+':''}$${monthPnl.toFixed(2)}</span></span>
-  `;
-}
+// (Calendar heatmap removed)
 
 // ── Last Update ──
 function updateTimestamp() {
@@ -2375,7 +2197,7 @@ async function loadToday() {
   pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
   pnlEl.className = `today-val ${pnl >= 0 ? 'positive' : 'negative'}`;
   document.getElementById('todayTrades').textContent = d.trades || 0;
-  document.getElementById('todayWL').textContent = d.trades > 0 ? `${d.wins}/${d.losses}` : '--';
+  document.getElementById('todayWL').textContent = d.trades > 0 ? `${d.wins||0}/${d.losses||0}` : '--';
   document.getElementById('todayRounds').textContent = d.rounds || 0;
   document.getElementById('todayBest').textContent = d.best ? `+$${d.best.toFixed(2)}` : '--';
   document.getElementById('todayWorst').textContent = d.worst ? `$${d.worst.toFixed(2)}` : '--';
@@ -2396,11 +2218,14 @@ async function loadMode() {
 }
 
 async function init() {
-  const [stats] = await Promise.all([
-    fetchJSON('/api/stats'),
-    loadTrades(), loadOpenPositions(), loadReasoning(), loadToday(),
-    loadSignals(), loadNotes(), loadChart(), loadRounds(), loadReviews(), loadTicker(), loadMode(),
-  ]);
+  let stats = null;
+  try {
+    [stats] = await Promise.all([
+      fetchJSON('/api/stats'),
+      loadTrades(), loadOpenPositions(), loadReasoning(), loadToday(),
+      loadSignals(), loadNotes(), loadChart(), loadRounds(), loadReviews(), loadTicker(), loadMode(),
+    ]);
+  } catch(e) { console.error('init error:', e); }
   // Stats needs special handling for mood
   if (stats) {
     const s = stats;
@@ -2457,12 +2282,16 @@ function updateCountdownDisplay() {
   if (el) el.textContent = autoRefreshPaused ? 'paused' : `${refreshCounter}s`;
 }
 
+let _refreshing = false;
 function tickCountdown() {
   if (autoRefreshPaused) return;
   refreshCounter--;
   if (refreshCounter <= 0) {
     refreshCounter = refreshInterval;
-    init();
+    if (!_refreshing) {
+      _refreshing = true;
+      init().finally(() => { _refreshing = false; });
+    }
   }
   updateCountdownDisplay();
 }

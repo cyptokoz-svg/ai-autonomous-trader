@@ -238,7 +238,7 @@ class DataEngine:
         df["vol_sma20"] = ta.sma(v, length=20)
 
         # 量比 (当前成交量 / 20日均量)
-        df["vol_ratio"] = v / df["vol_sma20"]
+        df["vol_ratio"] = v / df["vol_sma20"].replace(0, pd.NA)
 
         # ── Donchian Channel ──
         dc = ta.donchian(h, l, lower_length=20, upper_length=20)
@@ -246,21 +246,38 @@ class DataEngine:
             for col in dc.columns:
                 df[col] = dc[col]
 
-        # ── VWAP (日内公允价格) ──
-        typical = (h + l + c) / 3
-        cum_tp_vol = (typical * v).cumsum()
-        cum_vol = v.cumsum()
-        df["vwap"] = cum_tp_vol / cum_vol
+        # ── VWAP (按日重置) ──
+        if "datetime" in df.columns:
+            typical = (h + l + c) / 3
+            tp_vol = typical * v
+            day_group = df["datetime"].dt.date
+            df["vwap"] = tp_vol.groupby(day_group).cumsum() / v.groupby(day_group).cumsum()
+        else:
+            typical = (h + l + c) / 3
+            df["vwap"] = (typical * v).cumsum() / v.cumsum()
 
         # ── CMF (Chaikin Money Flow, 20期) ──
         mfv = ((c - l) - (h - c)) / (h - l + 1e-10) * v
         df["cmf20"] = mfv.rolling(20).sum() / v.rolling(20).sum()
 
-        # ── Pivot Points (日内支撑阻力) ──
-        pp = (h.shift(1) + l.shift(1) + c.shift(1)) / 3
-        df["pivot"] = pp
-        df["pivot_r1"] = 2 * pp - l.shift(1)
-        df["pivot_s1"] = 2 * pp - h.shift(1)
+        # ── Pivot Points (基于前一日 HLC) ──
+        if "datetime" in df.columns:
+            day_group = df["datetime"].dt.date
+            daily_agg = df.groupby(day_group).agg(
+                dh=("high", "max"), dl=("low", "min"), dc=("close", "last")
+            ).shift(1)
+            prev_h = day_group.map(daily_agg["dh"])
+            prev_l = day_group.map(daily_agg["dl"])
+            prev_c = day_group.map(daily_agg["dc"])
+            pp = (prev_h + prev_l + prev_c) / 3
+            df["pivot"] = pp
+            df["pivot_r1"] = 2 * pp - prev_l
+            df["pivot_s1"] = 2 * pp - prev_h
+        else:
+            pp = (h.shift(1) + l.shift(1) + c.shift(1)) / 3
+            df["pivot"] = pp
+            df["pivot_r1"] = 2 * pp - l.shift(1)
+            df["pivot_s1"] = 2 * pp - h.shift(1)
 
         # ── ROC (Rate of Change, 12期) ──
         df["roc12"] = ta.roc(c, length=12)
@@ -504,7 +521,7 @@ class DataEngine:
                 macd_line = last.get("MACD_12_26_9")
                 macd_hist = last.get("MACDh_12_26_9")
                 macd_sig = last.get("MACDs_12_26_9")
-                if macd_line is not None and pd.notna(macd_line):
+                if all(v is not None and pd.notna(v) for v in [macd_line, macd_hist, macd_sig]):
                     lines.append(f"MACD={macd_line:.1f} Hist={macd_hist:.1f} Sig={macd_sig:.1f}")
 
                 # RSI + MFI + Stoch 合并一行
@@ -524,7 +541,7 @@ class DataEngine:
 
                 # ATR + ADX + 量比 合并一行
                 vol_trend = []
-                if "atr14" in last and pd.notna(last["atr14"]):
+                if "atr14" in last and pd.notna(last["atr14"]) and last["close"]:
                     atr_pct = last["atr14"] / last["close"] * 100
                     vol_trend.append(f"ATR={last['atr14']:.1f}({atr_pct:.1f}%)")
                 adx_col = [c for c in df.columns if c == "ADX_14" or (c.startswith("ADX") and "R" not in c)]
@@ -539,7 +556,7 @@ class DataEngine:
                 bbp = last.get("BBP_20_2.0")
                 bbl = last.get("BBL_20_2.0")
                 bbu = last.get("BBU_20_2.0")
-                if bbp is not None and pd.notna(bbp):
+                if all(v is not None and pd.notna(v) for v in [bbp, bbl, bbu]):
                     lines.append(f"BB: {bbl:.1f}~{bbu:.1f} 位置={bbp:.0%}")
 
                 # OBV + SuperTrend + CMF + ROC 合并

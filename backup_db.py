@@ -3,11 +3,11 @@
 Database backup script for trades.db
 Run daily via cron or manually: python3 backup_db.py
 
+Uses SQLite online backup API for safe copying (WAL-compatible).
 Keeps the last 7 backups, deletes older ones.
 """
 
-import shutil
-import os
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
@@ -31,8 +31,13 @@ def backup_db():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     backup_path = BACKUP_DIR / f"trades_{timestamp}.db"
 
-    # Copy
-    shutil.copy2(DB_PATH, backup_path)
+    # Use SQLite backup API (safe for WAL mode, concurrent access)
+    src = sqlite3.connect(DB_PATH)
+    dst = sqlite3.connect(backup_path)
+    src.backup(dst)
+    dst.close()
+    src.close()
+
     size_mb = backup_path.stat().st_size / (1024 * 1024)
     print(f"[OK] Backup created: {backup_path.name} ({size_mb:.2f} MB)")
 

@@ -83,7 +83,9 @@ def check_okx_api() -> str | None:
 
 
 def run():
-    from notify import notify_error
+    if not DB_PATH.exists():
+        print(f"[{datetime.now(timezone.utc).strftime('%H:%M UTC')}] 数据库不存在，跳过检查")
+        return
 
     issues = []
     for check in [check_round_timeout, check_orphan_positions, check_okx_api]:
@@ -94,7 +96,11 @@ def run():
     if issues:
         msg = "⚠️ 看门狗告警\n\n" + "\n".join(f"• {i}" for i in issues)
         print(msg)
-        notify_error(msg)
+        try:
+            from notify import notify_error
+            notify_error(msg)
+        except Exception as e:
+            print(f"通知发送失败: {e}")
     else:
         print(f"[{datetime.now(timezone.utc).strftime('%H:%M UTC')}] 一切正常")
 

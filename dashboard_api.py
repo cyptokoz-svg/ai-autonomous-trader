@@ -6,13 +6,11 @@ import json
 import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from trade_db import get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds, get_reviews, get_trades_paged
+from trade_db import get_conn, get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds, get_reviews, get_trades_paged
 from config import OKX_DEMO
 from pathlib import Path
-import sqlite3
 import urllib.request
 
-DB_PATH = Path(__file__).parent / "trades.db"
 _price_cache = {}
 _price_cache_time = 0
 MEMORY_DIR = Path.home() / ".claude/projects/-Users-crypto/memory"
@@ -28,8 +26,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(get_stats())
         elif path == "/api/trades":
             params = parse_qs(parsed.query)
-            n = int(params.get("n", [15])[0])
-            offset = int(params.get("offset", [0])[0])
+            n = self._safe_int(params.get("n", [15])[0], 15)
+            offset = self._safe_int(params.get("offset", [0])[0], 0)
             self._json_response(get_trades_paged(n, offset))
         elif path == "/api/open":
             self._json_response(get_open_trades())
@@ -45,13 +43,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_recent_reasoning())
         elif path == "/api/rounds":
             params = parse_qs(parsed.query)
-            n = int(params.get("n", [20])[0])
-            offset = int(params.get("offset", [0])[0])
+            n = self._safe_int(params.get("n", [20])[0], 20)
+            offset = self._safe_int(params.get("offset", [0])[0], 0)
             self._json_response(get_recent_rounds(n, offset))
         elif path == "/api/reviews":
             params = parse_qs(parsed.query)
-            n = int(params.get("n", [5])[0])
-            offset = int(params.get("offset", [0])[0])
+            n = self._safe_int(params.get("n", [5])[0], 5)
+            offset = self._safe_int(params.get("offset", [0])[0], 0)
             self._json_response(get_reviews(n, offset))
         elif path == "/api/today":
             self._json_response(self._get_today())
@@ -66,10 +64,17 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
+    @staticmethod
+    def _safe_int(val, default: int) -> int:
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return default
+
     def _json_response(self, data):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", "http://localhost:8888")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False, default=str).encode())
 
@@ -86,15 +91,18 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.wfile.write(b"dashboard.html not found")
 
     def _get_all_closed(self):
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT id, timestamp, coin, side, entry_price, exit_price, "
-            "pnl, pnl_pct, sheets, leverage, close_reason, duration_min, confidence "
-            "FROM trades WHERE status='closed' ORDER BY id"
-        ).fetchall()
-        conn.close()
-        return [dict(r) for r in rows]
+        try:
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT id, timestamp, coin, side, entry_price, exit_price, "
+                "pnl, pnl_pct, sheets, leverage, close_reason, duration_min, confidence "
+                "FROM trades WHERE status='closed' ORDER BY id"
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
+        finally:
+            conn.close()
 
     def _get_prices(self):
         """从 OKX 公共 API 实时拉取 BTC/ETH 价格（自动匹配模拟/实盘），60秒缓存"""
@@ -150,19 +158,20 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         """今日统计"""
         from datetime import datetime, timezone  # noqa: local import OK
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        # 今日已平仓
-        closed = conn.execute(
-            "SELECT pnl FROM trades WHERE status='closed' AND timestamp >= ?",
-            (today,)
-        ).fetchall()
-        # 今日轮次
-        rounds = conn.execute(
-            "SELECT COUNT(*) FROM round_logs WHERE timestamp >= ?",
-            (today,)
-        ).fetchone()[0]
-        conn.close()
+        try:
+            conn = get_conn()
+            closed = conn.execute(
+                "SELECT pnl FROM trades WHERE status='closed' AND timestamp >= ?",
+                (today,)
+            ).fetchall()
+            rounds = conn.execute(
+                "SELECT COUNT(*) FROM round_logs WHERE timestamp >= ?",
+                (today,)
+            ).fetchone()[0]
+        except Exception:
+            return {"trades": 0, "wins": 0, "losses": 0, "pnl": 0, "best": 0, "worst": 0, "rounds": 0}
+        finally:
+            conn.close()
         pnls = [r["pnl"] or 0 for r in closed]
         wins = sum(1 for p in pnls if p > 0)
         return {
@@ -176,22 +185,24 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         }
 
     def _get_calendar(self):
-        """每日PnL热力图数据：最近90天"""
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT date(timestamp) as day, COUNT(*) as trades, "
-            "SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins, "
-            "SUM(pnl) as pnl "
-            "FROM trades WHERE status='closed' "
-            "GROUP BY date(timestamp) ORDER BY day"
-        ).fetchall()
-        # Also get round counts per day
-        rounds = conn.execute(
-            "SELECT date(timestamp) as day, COUNT(*) as rounds "
-            "FROM round_logs GROUP BY date(timestamp)"
-        ).fetchall()
-        conn.close()
+        """每日PnL热力图数据"""
+        try:
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT date(timestamp) as day, COUNT(*) as trades, "
+                "SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins, "
+                "SUM(pnl) as pnl "
+                "FROM trades WHERE status='closed' "
+                "GROUP BY date(timestamp) ORDER BY day"
+            ).fetchall()
+            rounds = conn.execute(
+                "SELECT date(timestamp) as day, COUNT(*) as rounds "
+                "FROM round_logs GROUP BY date(timestamp)"
+            ).fetchall()
+        except Exception:
+            return []
+        finally:
+            conn.close()
         rounds_map = {r["day"]: r["rounds"] for r in rounds}
         return [
             {
@@ -205,13 +216,16 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         ]
 
     def _get_recent_reasoning(self):
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT id, timestamp, coin, side, reasoning, market_state, indicators_used, lessons, status, pnl "
-            "FROM trades ORDER BY id DESC LIMIT 5"
-        ).fetchall()
-        conn.close()
+        try:
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT id, timestamp, coin, side, reasoning, market_state, indicators_used, lessons, status, pnl "
+                "FROM trades ORDER BY id DESC LIMIT 5"
+            ).fetchall()
+        except Exception:
+            return []
+        finally:
+            conn.close()
         result = []
         for r in rows:
             d = dict(r)
@@ -230,5 +244,5 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"Dashboard running at http://localhost:{PORT}")
-    server = HTTPServer(("0.0.0.0", PORT), DashboardHandler)
+    server = HTTPServer(("127.0.0.1", PORT), DashboardHandler)
     server.serve_forever()

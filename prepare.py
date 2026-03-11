@@ -171,7 +171,8 @@ async def main():
     if not engine.is_ready:
         print("❌ 数据未就绪，请检查网络")
         if report_path.exists():
-            print("⚠️ latest_report.txt 是旧数据，请注意！")
+            report_path.unlink()
+            print("⚠️ 已删除旧报告，防止 AI 基于过期数据决策")
         return
 
     # 合并报告
@@ -207,7 +208,7 @@ async def main():
         tk = engine.get_ticker(pair)
         if tk:
             coin = pair.replace("-USDT-SWAP", "")
-            chg = ((tk["last"] - tk["open24h"]) / tk["open24h"] * 100) if tk.get("open24h") else 0
+            chg = ((tk["last"] - tk["open24h"]) / tk["open24h"] * 100) if tk.get("open24h", 0) else 0
             print(f"  {coin}: ${tk['last']:,.1f} ({chg:+.2f}%)")
 
     print(f"✅ 报告已保存 latest_report.txt ({len(report)} 字符)")

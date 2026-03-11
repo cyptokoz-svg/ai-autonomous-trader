@@ -107,8 +107,8 @@ def update_memory():
 | 盈亏比 | {stats['pnl_ratio']:.2f} |
 | 利润因子 | {stats['profit_factor']:.2f} |
 | 最大连亏 | {stats['max_consecutive_loss']}笔 |
-| 最佳单笔 | ${stats['best_trade']['pnl']:.2f} ({stats['best_trade']['coin']}) |
-| 最差单笔 | ${stats['worst_trade']['pnl']:.2f} ({stats['worst_trade']['coin']}) |
+| 最佳单笔 | ${stats.get('best_trade', {}).get('pnl', 0):.2f} ({stats.get('best_trade', {}).get('coin', '--')}) |
+| 最差单笔 | ${stats.get('worst_trade', {}).get('pnl', 0):.2f} ({stats.get('worst_trade', {}).get('coin', '--')}) |
 """
 
     # 按币种

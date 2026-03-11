@@ -22,8 +22,12 @@ def _load_okx_config() -> dict:
     p = Path.home() / ".okx" / "config.toml"
     if not p.exists():
         return {}
-    with open(p, "rb") as f:
-        return tomllib.load(f)
+    try:
+        with open(p, "rb") as f:
+            return tomllib.load(f)
+    except Exception as e:
+        print(f"[config] ~/.okx/config.toml 解析失败: {e}")
+        return {}
 
 _OKX_CFG = _load_okx_config()
 _DEFAULT_PROFILE = _OKX_CFG.get("default_profile", "demo")

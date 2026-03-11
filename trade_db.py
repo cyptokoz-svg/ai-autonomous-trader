@@ -98,11 +98,14 @@ def init_db():
         );
         """)
         # Add new columns if missing (backwards compat)
-        for col, coltype in [("actual_entry_price", "REAL"), ("actual_exit_price", "REAL")]:
-            try:
-                conn.execute(f"ALTER TABLE trades ADD COLUMN {col} {coltype}")
-            except sqlite3.OperationalError:
-                pass  # column already exists
+        _MIGRATE_COLS = {"actual_entry_price": "REAL", "actual_exit_price": "REAL"}
+        existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(trades)").fetchall()}
+        for col, coltype in _MIGRATE_COLS.items():
+            if col not in existing_cols:
+                try:
+                    conn.execute(f"ALTER TABLE trades ADD COLUMN {col} {coltype}")
+                except sqlite3.OperationalError:
+                    pass  # another process may have added it
 
         conn.commit()
         conn.close()
@@ -161,13 +164,15 @@ def record_close(
     """记录平仓"""
     conn = get_conn()
     try:
-        conn.execute("""
+        cur = conn.execute("""
             UPDATE trades SET
                 exit_price = ?, actual_exit_price = ?, pnl = ?, pnl_pct = ?,
                 duration_min = ?, close_reason = ?,
                 lessons = ?, status = 'closed'
-            WHERE id = ?
+            WHERE id = ? AND status = 'open'
         """, (exit_price, actual_exit_price, pnl, pnl_pct, duration_min, close_reason, lessons, trade_id))
+        if cur.rowcount == 0:
+            logger.warning("record_close: trade_id=%s 不存在或已平仓", trade_id)
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -234,13 +239,13 @@ def get_stats() -> dict:
     trades = [dict(r) for r in closed]
     total = len(trades)
     wins = [t for t in trades if (t["pnl"] or 0) > 0]
-    losses = [t for t in trades if (t["pnl"] or 0) <= 0]
+    losses = [t for t in trades if (t["pnl"] or 0) < 0]
 
     total_pnl = sum(t["pnl"] or 0 for t in trades)
-    avg_win = sum(t["pnl"] for t in wins) / len(wins) if wins else 0
-    avg_loss = abs(sum(t["pnl"] for t in losses) / len(losses)) if losses else 0
-    gross_profit = sum(t["pnl"] for t in wins)
-    gross_loss = abs(sum(t["pnl"] for t in losses))
+    avg_win = sum(t["pnl"] or 0 for t in wins) / len(wins) if wins else 0
+    avg_loss = abs(sum(t["pnl"] or 0 for t in losses) / len(losses)) if losses else 0
+    gross_profit = sum(t["pnl"] or 0 for t in wins)
+    gross_loss = abs(sum(t["pnl"] or 0 for t in losses))
 
     # 按币种
     by_coin = {}
@@ -269,18 +274,19 @@ def get_stats() -> dict:
     cur_loss = 0
     cur_streak = 0  # positive = wins, negative = losses
     for t in trades:
-        if (t["pnl"] or 0) <= 0:
+        if (t["pnl"] or 0) < 0:
             cur_loss += 1
             max_consec_loss = max(max_consec_loss, cur_loss)
         else:
             cur_loss = 0
     # 当前连胜/连亏（从最后一笔往回数）
     for t in reversed(trades):
+        pnl = t["pnl"] or 0
         if cur_streak == 0:
-            cur_streak = 1 if (t["pnl"] or 0) > 0 else -1
-        elif cur_streak > 0 and (t["pnl"] or 0) > 0:
+            cur_streak = 1 if pnl > 0 else (-1 if pnl < 0 else 0)
+        elif cur_streak > 0 and pnl > 0:
             cur_streak += 1
-        elif cur_streak < 0 and (t["pnl"] or 0) <= 0:
+        elif cur_streak < 0 and pnl < 0:
             cur_streak -= 1
         else:
             break
@@ -325,6 +331,8 @@ def get_stats() -> dict:
 
 def update_signal_stat(indicator_combo: str, won: bool, pnl: float):
     """更新信号组合统计"""
+    indicator_combo = indicator_combo.upper().strip()
+    pnl = pnl or 0.0
     conn = get_conn()
     try:
         existing = conn.execute(

@@ -1,10 +1,12 @@
 """Telegram notification module for autonomous trader."""
 
 import os
-import json
+import logging
 import urllib.request
 import urllib.parse
 from datetime import datetime, timezone, timedelta
+
+logger = logging.getLogger("notify")
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -25,8 +27,9 @@ def send_message(text: str) -> bool:
         }).encode()
         req = urllib.request.Request(url, data=data, method="POST")
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status == 200
-    except Exception:
+            return resp.status < 400
+    except Exception as e:
+        logger.error("Telegram 发送失败: %s", e)
         return False
 
 
@@ -34,10 +37,15 @@ def _ts() -> str:
     return datetime.now(CST).strftime("%H:%M:%S")
 
 
+def _is_long(side: str) -> bool:
+    return side.upper() in ("LONG", "BUY")
+
+
 def notify_open(coin: str, side: str, entry_price: float, leverage: int, sheets: float):
-    emoji = "\U0001f4c8" if side.upper() == "LONG" else "\U0001f4c9"
+    emoji = "\U0001f4c8" if _is_long(side) else "\U0001f4c9"
+    label = "LONG" if _is_long(side) else "SHORT"
     text = (
-        f"{emoji} <b>Open {side.upper()}</b> {coin}\n"
+        f"{emoji} <b>Open {label}</b> {coin}\n"
         f"Entry: {entry_price}  |  Lev: {leverage}x  |  Size: {sheets}\n"
         f"Time: {_ts()}"
     )
@@ -45,6 +53,7 @@ def notify_open(coin: str, side: str, entry_price: float, leverage: int, sheets:
 
 
 def notify_close(coin: str, side: str, pnl: float, close_reason: str):
+    pnl = pnl or 0
     emoji = "\U0001f4b0" if pnl >= 0 else "\U0001f4b8"
     pnl_str = f"+{pnl:.2f}" if pnl >= 0 else f"{pnl:.2f}"
     text = (

@@ -81,7 +81,10 @@ def check_decision(decision: dict, equity: float) -> tuple[bool, str]:
         return False, f"REJECT: 仓位比例 {size_pct:.0%} > 50%，太大了"
 
     # ── 检查同时持仓数 ──
-    open_trades = get_open_trades()
+    try:
+        open_trades = get_open_trades()
+    except Exception as e:
+        return False, f"REJECT: 无法读取持仓数据: {e}"
     if len(open_trades) >= MAX_POSITIONS:
         return False, f"REJECT: 已有 {len(open_trades)} 个持仓，上限 {MAX_POSITIONS}"
 
@@ -91,7 +94,10 @@ def check_decision(decision: dict, equity: float) -> tuple[bool, str]:
             return False, f"REJECT: {coin} 已有持仓，不能重复开"
 
     # ── 检查总回撤（峰谷法，与 trade_db.get_stats 一致）──
-    stats = get_stats()
+    try:
+        stats = get_stats()
+    except Exception as e:
+        return False, f"REJECT: 无法读取统计数据: {e}"
     if stats["total"] > 0:
         max_dd_pct = stats.get("max_drawdown_pct", 0)
         if max_dd_pct >= MAX_DRAWDOWN_PCT * 100:
