@@ -44,9 +44,50 @@
    - 每周一第一轮在 UTC 00:00 ~ 01:00 之间时 → 执行每周复盘
    - 其他时间 → 跳过，正常交易
 
-5. **按 ai-trader-prompt.md 分析决策**
-   - 多时间框架分析（日线→4H→1H→15m）
-   - 输出 JSON 决策
+5. **分析决策（不需要读 ai-trader-prompt.md，规则已在下方）**
+
+   **你是交易员，不是规则引擎。** 用判断力，不是对清单打勾。不确定就 HOLD。
+
+   **分析方法：** 日线(大方向) → 4H(中期结构) → 1H(入场时机) → 15m(精确入场价)
+   1. 判断市场状态 — 趋势/震荡/突破/极端波动？
+   2. 评估方向 — 多头/空头/不明确？
+   3. 找入场理由 — 值得入场吗？理由充分吗？
+   4. 评估风险 — 止损放哪？盈亏比够不够？
+   5. 给出置信度 — 不确定就不做
+
+   **止损（必须设置）：** 关键支撑阻力位外侧 / ATR倍数 / 均线 / 布林带外侧 / 固定百分比。止损位必须有技术意义，止损距离决定仓位大小。
+   **止盈：** 关键阻力支撑 / ATR倍数 / 布林带对侧 / 移动止盈 / 分批。趋势和震荡用不同策略。
+   **仓位：** risk_usd = 权益 × 风险比例(1-3%) → sheets = floor(risk_usd / (止损距离 × 合约面值))
+
+   **每次决策必须写清楚 reasoning**（看到了什么、怎么判断的、为什么这样做），这是复盘学习素材。
+
+   **输出 JSON：**
+   ```json
+   {
+     "action": "open_long | open_short | close | hold",
+     "coin": "BTC-USDT-SWAP",
+     "side": "buy | sell",
+     "leverage": 3,
+     "entry_price": 98500.0,
+     "sheets": 5,
+     "position_size_pct": 0.20,
+     "stop_loss": {"price": 97200.0, "method": "止损方式和理由"},
+     "take_profit": {"price": 100700.0, "method": "止盈方式和理由"},
+     "confidence": 0.72,
+     "risk_usd": 65.0,
+     "risk_reward_ratio": 1.69,
+     "indicators_used": "EMA+MACD+RSI",
+     "reasoning": {
+       "market_state": "当前市场判断",
+       "direction": "看多/空/不清的理由",
+       "trigger": "入场的具体信号",
+       "risk": "风险管理",
+       "concern": "不确定性"
+     },
+     "market_state": "trending_up | trending_down | ranging | volatile"
+   }
+   ```
+   HOLD 时：`{"action":"hold","reasoning":{"market_state":"...","why_hold":"...","watching":"..."}}`
 
 6. **风控硬检查（开仓前必过）**
    ```bash
