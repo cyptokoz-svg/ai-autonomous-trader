@@ -64,16 +64,12 @@ def check_decision(decision: dict, equity: float) -> tuple[bool, str]:
         if t["coin"] == coin:
             return False, f"REJECT: {coin} 已有持仓，不能重复开"
 
-    # ── 检查总回撤 ──
+    # ── 检查总回撤（峰谷法，与 trade_db.get_stats 一致）──
     stats = get_stats()
     if stats["total"] > 0 and equity > 0:
-        total_pnl = stats.get("total_pnl", 0)
-        # 假设初始资金 = 当前权益 - 累计盈亏
-        initial = equity - total_pnl
-        if initial > 0:
-            drawdown = -total_pnl / initial if total_pnl < 0 else 0
-            if drawdown >= MAX_DRAWDOWN_PCT:
-                return False, f"REJECT: 总回撤 {drawdown:.1%} ≥ {MAX_DRAWDOWN_PCT:.0%}，全停！"
+        max_dd_pct = stats.get("max_drawdown_pct", 0)
+        if max_dd_pct >= MAX_DRAWDOWN_PCT * 100:
+            return False, f"REJECT: 最大回撤 {max_dd_pct:.1f}% ≥ {MAX_DRAWDOWN_PCT:.0%}，全停！"
 
     # ── 检查必须有止损 ──
     sl = decision.get("stop_loss", {})

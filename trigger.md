@@ -59,8 +59,15 @@
      from trade_db import record_round
      record_round("<action>", "<一句话决策摘要>", btc_price=<>, eth_price=<>)
      ```
-   - 开仓/平仓 → 写入 trades 表
-   - 有新经验 → 更新 strategy-notes.md
+   - 开仓 → 写入 trades 表（record_open）
+   - 平仓 → 更新 trades 表（record_close）+ 更新信号统计：
+     ```python
+     from trade_db import update_signal_stat
+     # indicators_used 是开仓时记录的指标组合，用逗号拼接
+     update_signal_stat("EMA+MACD+RSI", won=True, pnl=12.5)
+     ```
+   - 有新经验/发现 → 更新 strategy-notes.md（直接编辑文件）
+   - 重要：strategy-notes.md 的更新会出现在下一轮的 latest_report.txt 中
 
 ---
 

@@ -11,9 +11,12 @@ import json
 import urllib.request
 from datetime import datetime, timezone
 
+from pathlib import Path
 from config import OKX_DEMO
 from data_engine import DataEngine
 from trade_db import get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds
+
+MEMORY_DIR = Path.home() / ".claude/projects/-Users-crypto/memory"
 
 
 def fetch_account_summary() -> str:
@@ -69,6 +72,17 @@ def fetch_account_summary() -> str:
     return "\n".join(lines)
 
 
+def fetch_strategy_notes() -> str:
+    """读取 strategy-notes.md，AI 的核心经验库"""
+    notes_path = MEMORY_DIR / "strategy-notes.md"
+    if not notes_path.exists():
+        return ""
+    content = notes_path.read_text().strip()
+    if not content or "暂无" in content.split("当前有效规则")[1].split("##")[0] if "当前有效规则" in content else True:
+        return ""
+    return f"## 你的策略经验（必须参考）\n\n{content}\n"
+
+
 def fetch_recent_context() -> str:
     """获取最近几轮的决策摘要，让 AI 知道上轮留下了什么观察"""
     data = get_recent_rounds(n=5, offset=0)
@@ -112,6 +126,7 @@ async def main():
         f"# 模式: {mode}",
         "",
         fetch_recent_context(),
+        fetch_strategy_notes(),
         engine.generate_report(),
         fetch_account_summary(),
     ]
