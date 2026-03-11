@@ -184,54 +184,66 @@ def record_close(
 
 def get_open_trades() -> list[dict]:
     """查询所有未平仓交易"""
+    conn = None
     try:
         conn = get_conn()
         rows = conn.execute("SELECT * FROM trades WHERE status = 'open'").fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except Exception as e:
         logger.error("get_open_trades 失败: %s", e)
         return []
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_recent_trades(n: int = 5) -> list[dict]:
     """查询最近 n 笔已平仓交易"""
+    conn = None
     try:
         conn = get_conn()
         rows = conn.execute(
             "SELECT * FROM trades WHERE status = 'closed' ORDER BY id DESC LIMIT ?", (n,)
         ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except Exception as e:
         logger.error("get_recent_trades 失败: %s", e)
         return []
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_trades_paged(n: int = 15, offset: int = 0) -> dict:
     """分页查询已平仓交易"""
+    conn = None
     try:
         conn = get_conn()
         total = conn.execute("SELECT COUNT(*) FROM trades WHERE status='closed'").fetchone()[0]
         rows = conn.execute(
             "SELECT * FROM trades WHERE status='closed' ORDER BY id DESC LIMIT ? OFFSET ?", (n, offset)
         ).fetchall()
-        conn.close()
         return {"items": [dict(r) for r in rows], "total": total}
     except Exception as e:
         logger.error("get_trades_paged 失败: %s", e)
         return {"items": [], "total": 0}
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_stats() -> dict:
     """计算核心统计指标"""
+    conn = None
     try:
         conn = get_conn()
         closed = conn.execute("SELECT * FROM trades WHERE status = 'closed'").fetchall()
-        conn.close()
     except Exception as e:
         logger.error("get_stats 查询失败: %s", e)
         return {"total": 0}
+    finally:
+        if conn:
+            conn.close()
 
     if not closed:
         return {"total": 0}
@@ -366,16 +378,19 @@ def update_signal_stat(indicator_combo: str, won: bool, pnl: float):
 
 def get_signal_stats() -> list[dict]:
     """获取所有信号组合统计"""
+    conn = None
     try:
         conn = get_conn()
         rows = conn.execute(
             "SELECT * FROM signal_stats ORDER BY used_count DESC"
         ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except Exception as e:
         logger.error("get_signal_stats 失败: %s", e)
         return []
+    finally:
+        if conn:
+            conn.close()
 
 
 def record_round(
@@ -406,17 +421,20 @@ def record_round(
 
 def get_recent_rounds(n: int = 20, offset: int = 0) -> dict:
     """获取轮次日志（分页）"""
+    conn = None
     try:
         conn = get_conn()
         total = conn.execute("SELECT COUNT(*) FROM round_logs").fetchone()[0]
         rows = conn.execute(
             "SELECT * FROM round_logs ORDER BY id DESC LIMIT ? OFFSET ?", (n, offset)
         ).fetchall()
-        conn.close()
         return {"items": [dict(r) for r in rows], "total": total}
     except Exception as e:
         logger.error("get_recent_rounds 失败: %s", e)
         return {"items": [], "total": 0}
+    finally:
+        if conn:
+            conn.close()
 
 
 def record_review(
@@ -446,17 +464,20 @@ def record_review(
 
 def get_reviews(n: int = 5, offset: int = 0) -> dict:
     """获取复盘记录（分页）"""
+    conn = None
     try:
         conn = get_conn()
         total = conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0]
         rows = conn.execute(
             "SELECT * FROM reviews ORDER BY id DESC LIMIT ? OFFSET ?", (n, offset)
         ).fetchall()
-        conn.close()
         return {"items": [dict(r) for r in rows], "total": total}
     except Exception as e:
         logger.error("get_reviews 失败: %s", e)
         return {"items": [], "total": 0}
+    finally:
+        if conn:
+            conn.close()
 
 
 # 初始化

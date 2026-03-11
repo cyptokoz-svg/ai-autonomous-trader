@@ -11,10 +11,11 @@ from trade_db import get_conn, get_stats, get_recent_trades, get_open_trades, ge
 from config import OKX_DEMO
 from pathlib import Path
 import urllib.request
+import os
 
-DASH_USER = "admin"
-DASH_PASS = "taoli2"
-DASH_TOKEN = "taoli2"
+DASH_USER = os.environ.get("DASH_USER", "admin")
+DASH_PASS = os.environ.get("DASH_PASS", "taoli2")
+DASH_TOKEN = os.environ.get("DASH_TOKEN", "taoli2")
 
 _price_cache = {}
 _price_cache_time = 0
@@ -110,8 +111,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(get_stats())
         elif path == "/api/trades":
             params = parse_qs(parsed.query)
-            n = self._safe_int(params.get("n", [15])[0], 15)
-            offset = self._safe_int(params.get("offset", [0])[0], 0)
+            n = min(self._safe_int(params.get("n", [15])[0], 15), 200)
+            offset = min(self._safe_int(params.get("offset", [0])[0], 0), 10000)
             self._json_response(get_trades_paged(n, offset))
         elif path == "/api/open":
             self._json_response(get_open_trades())
@@ -127,13 +128,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_recent_reasoning())
         elif path == "/api/rounds":
             params = parse_qs(parsed.query)
-            n = self._safe_int(params.get("n", [20])[0], 20)
-            offset = self._safe_int(params.get("offset", [0])[0], 0)
+            n = min(self._safe_int(params.get("n", [20])[0], 20), 200)
+            offset = min(self._safe_int(params.get("offset", [0])[0], 0), 10000)
             self._json_response(get_recent_rounds(n, offset))
         elif path == "/api/reviews":
             params = parse_qs(parsed.query)
-            n = self._safe_int(params.get("n", [5])[0], 5)
-            offset = self._safe_int(params.get("offset", [0])[0], 0)
+            n = min(self._safe_int(params.get("n", [5])[0], 5), 100)
+            offset = min(self._safe_int(params.get("offset", [0])[0], 0), 10000)
             self._json_response(get_reviews(n, offset))
         elif path == "/api/today":
             self._json_response(self._get_today())
@@ -161,8 +162,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         origin = self.headers.get("Origin", "")
-        allowed = origin if origin else "*"
-        self.send_header("Access-Control-Allow-Origin", allowed)
+        _ALLOWED_ORIGINS = {"http://localhost:8888", "http://127.0.0.1:8888",
+                            f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"}
+        if origin in _ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        else:
+            self.send_header("Access-Control-Allow-Origin", f"http://localhost:{PORT}")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False, default=str).encode())
 

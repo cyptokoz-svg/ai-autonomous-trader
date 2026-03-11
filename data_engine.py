@@ -71,7 +71,7 @@ class DataEngine:
         try:
             headers = {"x-simulated-trading": "1"} if OKX_DEMO else {}
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=15),
+                timeout=aiohttp.ClientTimeout(total=30),
                 headers=headers,
             ) as session:
                 tasks: list[asyncio.Task] = []
@@ -258,7 +258,7 @@ class DataEngine:
 
         # ── CMF (Chaikin Money Flow, 20期) ──
         mfv = ((c - l) - (h - c)) / (h - l + 1e-10) * v
-        df["cmf20"] = mfv.rolling(20).sum() / v.rolling(20).sum()
+        df["cmf20"] = mfv.rolling(20).sum() / (v.rolling(20).sum() + 1e-10)
 
         # ── Pivot Points (基于前一日 HLC) ──
         if "datetime" in df.columns:

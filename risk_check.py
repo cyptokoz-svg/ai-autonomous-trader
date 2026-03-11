@@ -67,7 +67,7 @@ def check_decision(decision: dict, equity: float) -> tuple[bool, str]:
         risk_usd = float(decision.get("risk_usd", 0) or 0)
     except (TypeError, ValueError):
         return False, f"REJECT: risk_usd 无效 ({decision.get('risk_usd')})"
-    if risk_usd > 0:
+    if risk_usd > 0 and equity > 0:
         risk_pct = risk_usd / equity
         if risk_pct > MAX_SINGLE_LOSS_PCT:
             return False, f"REJECT: 单笔风险 ${risk_usd:.2f} = {risk_pct:.1%} > 上限 {MAX_SINGLE_LOSS_PCT:.0%}"
