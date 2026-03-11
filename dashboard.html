@@ -177,6 +177,30 @@
     animation: pulse 2s infinite;
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .refresh-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--text-dim);
+  }
+  .refresh-countdown {
+    min-width: 58px;
+  }
+  .refresh-toggle {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 3px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    transition: all 0.2s;
+  }
+  .refresh-toggle:hover { border-color: var(--green); color: var(--green); }
+  .refresh-toggle.paused { border-color: var(--yellow); color: var(--yellow); }
   .mode-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.75em;
@@ -350,14 +374,40 @@
   .round-item {
     padding: 10px 18px;
     border-bottom: 1px solid var(--border);
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .round-item:last-child { border-bottom: none; }
+  .round-item:hover { background: var(--bg-card-hover); }
+  .round-row {
     display: grid;
     grid-template-columns: 72px 60px 1fr auto;
     gap: 8px;
     align-items: center;
-    font-size: 0.8em;
   }
-  .round-item:last-child { border-bottom: none; }
-  .round-item:hover { background: var(--bg-card-hover); }
+  .round-detail {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border-left: 3px solid var(--blue);
+    color: var(--text);
+    font-size: 0.95em;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .round-item.expanded .round-detail { display: block; }
+  .round-item.expanded .round-summary { white-space: normal; }
+  .round-expand {
+    font-size: 0.7em;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+    margin-left: 4px;
+  }
+  .round-item.expanded .round-expand { transform: rotate(90deg); }
   .round-time {
     color: var(--text-dim);
     font-family: 'JetBrains Mono', monospace;
@@ -950,6 +1000,10 @@
       <span id="modeBadge" class="mode-badge mode-demo">DEMO</span>
       <div class="live-badge"><span class="live-dot"></span> LIVE</div>
       <button class="lang-toggle" onclick="toggleLang()" id="langBtn">中文</button>
+      <div class="refresh-control">
+        <span class="refresh-countdown" id="refreshCountdown">30s</span>
+        <button class="refresh-toggle" id="refreshToggle" onclick="toggleAutoRefresh()">⏸</button>
+      </div>
     </div>
     <div class="last-update" id="lastUpdate">Last update: --</div>
     <div class="mood mood-neutral" id="moodBadge">Warming up...</div>
@@ -1525,11 +1579,17 @@ async function loadRounds() {
     const prices = (r.btc_price || r.eth_price)
       ? `B:${r.btc_price?Number(r.btc_price).toFixed(0):'--'} E:${r.eth_price?Number(r.eth_price).toFixed(1):'--'}`
       : '';
-    return `<div class="round-item">
-      <div class="round-time">${time}</div>
-      <div class="round-action ${cls}">${r.action.toUpperCase()}</div>
-      <div class="round-summary">${r.summary || '--'}</div>
-      <div class="round-prices">${prices}</div>
+    const summary = r.summary || '--';
+    const market = r.market_snapshot || '';
+    const detail = market ? `${summary}\n\n${market}` : summary;
+    return `<div class="round-item" onclick="this.classList.toggle('expanded')">
+      <div class="round-row">
+        <div class="round-time">${time}</div>
+        <div class="round-action ${cls}">${r.action.toUpperCase()}</div>
+        <div class="round-summary">${summary} <span class="round-expand">▶</span></div>
+        <div class="round-prices">${prices}</div>
+      </div>
+      <div class="round-detail">${detail}</div>
     </div>`;
   }).join('');
 
@@ -2070,7 +2130,43 @@ async function init() {
 applyLang();
 randomQuote();
 init();
-setInterval(init, 30000);
+// ── Auto-refresh with countdown ──
+let refreshInterval = 30;
+let refreshCounter = refreshInterval;
+let autoRefreshPaused = false;
+let countdownTimer = null;
+
+function updateCountdownDisplay() {
+  const el = document.getElementById('refreshCountdown');
+  if (el) el.textContent = autoRefreshPaused ? 'paused' : `${refreshCounter}s`;
+}
+
+function tickCountdown() {
+  if (autoRefreshPaused) return;
+  refreshCounter--;
+  if (refreshCounter <= 0) {
+    refreshCounter = refreshInterval;
+    init();
+  }
+  updateCountdownDisplay();
+}
+
+function toggleAutoRefresh() {
+  autoRefreshPaused = !autoRefreshPaused;
+  const btn = document.getElementById('refreshToggle');
+  if (autoRefreshPaused) {
+    btn.textContent = '▶';
+    btn.classList.add('paused');
+  } else {
+    btn.textContent = '⏸';
+    btn.classList.remove('paused');
+    refreshCounter = refreshInterval;
+  }
+  updateCountdownDisplay();
+}
+
+countdownTimer = setInterval(tickCountdown, 1000);
+updateCountdownDisplay();
 setInterval(loadTicker, 5000);
 setInterval(randomQuote, 60000);
 

@@ -32,25 +32,51 @@ def check_decision(decision: dict, equity: float) -> tuple[bool, str]:
     if action in ("hold", "close"):
         return True, "OK"
 
+    # ── 检查权益有效 ──
+    if equity <= 0:
+        return False, f"REJECT: 权益无效 ({equity})，无法计算风控"
+
     # ── 检查币种 ──
     coin = decision.get("coin", "")
     if coin not in ALLOWED_COINS:
         return False, f"REJECT: 币种 {coin} 不在允许列表 {ALLOWED_COINS}"
 
-    # ── 检查杠杆 ──
-    leverage = decision.get("leverage", 1)
+    # ── 检查杠杆（强制转数字）──
+    try:
+        leverage = int(decision.get("leverage", 1))
+    except (TypeError, ValueError):
+        return False, f"REJECT: 杠杆值无效 ({decision.get('leverage')})"
     if leverage > MAX_LEVERAGE:
         return False, f"REJECT: 杠杆 {leverage}x > 上限 {MAX_LEVERAGE}x"
+    if leverage < 1:
+        return False, f"REJECT: 杠杆 {leverage}x < 1，无效"
+
+    # ── 检查必须有止损 ──
+    sl = decision.get("stop_loss", {})
+    if not isinstance(sl, dict) or not sl.get("price"):
+        return False, "REJECT: 没有设止损！铁律：必须有止损"
+    try:
+        sl_price = float(sl["price"])
+    except (TypeError, ValueError):
+        return False, f"REJECT: 止损价格无效 ({sl.get('price')})"
+    if sl_price <= 0:
+        return False, f"REJECT: 止损价格必须 > 0，当前 {sl_price}"
 
     # ── 检查单笔风险 ──
-    risk_usd = decision.get("risk_usd", 0)
-    if risk_usd and equity > 0:
+    try:
+        risk_usd = float(decision.get("risk_usd", 0) or 0)
+    except (TypeError, ValueError):
+        return False, f"REJECT: risk_usd 无效 ({decision.get('risk_usd')})"
+    if risk_usd > 0:
         risk_pct = risk_usd / equity
         if risk_pct > MAX_SINGLE_LOSS_PCT:
             return False, f"REJECT: 单笔风险 ${risk_usd:.2f} = {risk_pct:.1%} > 上限 {MAX_SINGLE_LOSS_PCT:.0%}"
 
     # ── 检查仓位比例 ──
-    size_pct = decision.get("position_size_pct", 0)
+    try:
+        size_pct = float(decision.get("position_size_pct", 0) or 0)
+    except (TypeError, ValueError):
+        return False, f"REJECT: position_size_pct 无效 ({decision.get('position_size_pct')})"
     if size_pct > 0.50:
         return False, f"REJECT: 仓位比例 {size_pct:.0%} > 50%，太大了"
 
@@ -66,15 +92,10 @@ def check_decision(decision: dict, equity: float) -> tuple[bool, str]:
 
     # ── 检查总回撤（峰谷法，与 trade_db.get_stats 一致）──
     stats = get_stats()
-    if stats["total"] > 0 and equity > 0:
+    if stats["total"] > 0:
         max_dd_pct = stats.get("max_drawdown_pct", 0)
         if max_dd_pct >= MAX_DRAWDOWN_PCT * 100:
             return False, f"REJECT: 最大回撤 {max_dd_pct:.1f}% ≥ {MAX_DRAWDOWN_PCT:.0%}，全停！"
-
-    # ── 检查必须有止损 ──
-    sl = decision.get("stop_loss", {})
-    if not sl or not sl.get("price"):
-        return False, "REJECT: 没有设止损！铁律：必须有止损"
 
     return True, "PASS: 所有风控检查通过"
 
@@ -85,8 +106,17 @@ if __name__ == "__main__":
         print("      python3 risk_check.py '<JSON决策>' <当前权益>")
         sys.exit(1)
 
-    decision = json.loads(sys.argv[1])
-    equity = float(sys.argv[2]) if len(sys.argv) > 2 else 3000.0
+    try:
+        decision = json.loads(sys.argv[1])
+    except json.JSONDecodeError as e:
+        print(f"REJECT: JSON 解析失败: {e}")
+        sys.exit(1)
+
+    try:
+        equity = float(sys.argv[2]) if len(sys.argv) > 2 else 3000.0
+    except ValueError:
+        print(f"REJECT: 权益值无效: {sys.argv[2]}")
+        sys.exit(1)
 
     passed, reason = check_decision(decision, equity)
     print(reason)

@@ -8,7 +8,6 @@ AI 自主交易员 — 数据准备（一键拉取）
 """
 import asyncio
 import json
-import urllib.request
 from datetime import datetime, timezone
 
 from pathlib import Path
@@ -89,8 +88,15 @@ def fetch_strategy_notes() -> str:
     if not notes_path.exists():
         return ""
     content = notes_path.read_text().strip()
-    if not content or "暂无" in content.split("当前有效规则")[1].split("##")[0] if "当前有效规则" in content else True:
+    if not content:
         return ""
+    # 检查"当前有效规则"部分是否只有"暂无"
+    if "当前有效规则" in content:
+        parts = content.split("当前有效规则")
+        if len(parts) > 1:
+            section = parts[1].split("##")[0] if "##" in parts[1] else parts[1]
+            if "暂无" in section and len(section.strip()) < 20:
+                return ""
     return f"## 你的策略经验（必须参考）\n\n{content}\n"
 
 
@@ -122,12 +128,19 @@ async def main():
     mode = "模拟盘" if OKX_DEMO else "实盘"
     print(f"[{mode}] 正在拉取数据...")
 
+    report_path = Path(__file__).parent / "latest_report.txt"
+
     # 并行: 行情数据 + 统计
     engine = DataEngine()
-    await engine.update()
+    try:
+        await engine.update()
+    except Exception as e:
+        print(f"⚠️ 数据拉取异常: {e}")
 
     if not engine.is_ready:
         print("❌ 数据未就绪，请检查网络")
+        if report_path.exists():
+            print(f"⚠️ latest_report.txt 是旧数据，请注意！")
         return
 
     # 合并报告
@@ -144,11 +157,14 @@ async def main():
     ]
     report = "\n".join(parts)
 
-    with open("latest_report.txt", "w") as f:
-        f.write(report)
+    try:
+        with open(report_path, "w") as f:
+            f.write(report)
+    except IOError as e:
+        print(f"❌ 写入报告失败: {e}")
+        return
 
-    # 打印摘要（不打印完整报告，太长）
-    # 提取关键价格
+    # 打印摘要
     for pair in engine.pairs:
         tk = engine.get_ticker(pair)
         if tk:
