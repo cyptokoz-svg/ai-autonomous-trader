@@ -1,0 +1,19 @@
+# Database
+trades.db
+trades.db-wal
+trades.db-shm
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+
+# Reports (generated)
+latest_report.txt
+
+# Secrets - NEVER commit
+.env
+*.key
