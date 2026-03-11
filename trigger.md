@@ -4,15 +4,18 @@
 
 ## 步骤
 
-1. **拉数据（并行）**
+1. **拉数据（一键完成，~3秒）**
    ```bash
-   cd ~/Desktop/ai-autonomous-trader && python3 data_engine.py
-   cd ~/Desktop/ai-autonomous-trader && python3 stats.py
+   cd ~/Desktop/ai-autonomous-trader && python3 prepare.py
    ```
-   同时用 MCP 查:
-   - account_get_balance(ccy=USDT)
-   - swap_get_positions()
-   - swap_get_orders(instType=SWAP)
+   自动拉取：行情K线 + 技术指标 + 交易统计 + 持仓信息
+   自动匹配模拟盘/实盘（读 config.py 的 OKX_DEMO）
+   报告保存在 latest_report.txt
+
+   同时用 MCP 查（并行）:
+   - account_get_balance(ccy=USDT) → 获取最新权益
+   - swap_get_positions() → 确认链上持仓
+   - swap_get_orders(status=open) → 检查未成交挂单
 
 2. **处理上轮遗留 + 持仓风险评估**
    - 有未成交限价单 → 撤掉 (swap_cancel_order)
