@@ -72,6 +72,17 @@ def fetch_account_summary() -> str:
     return "\n".join(lines)
 
 
+def fetch_trading_log() -> str:
+    """读取 trading-log.md，最近5笔交易的关键教训"""
+    log_path = MEMORY_DIR / "trading-log.md"
+    if not log_path.exists():
+        return ""
+    content = log_path.read_text().strip()
+    if not content or "暂无" in content:
+        return ""
+    return f"## 最近交易教训（避免重蹈覆辙）\n\n{content}\n"
+
+
 def fetch_strategy_notes() -> str:
     """读取 strategy-notes.md，AI 的核心经验库"""
     notes_path = MEMORY_DIR / "strategy-notes.md"
@@ -127,6 +138,7 @@ async def main():
         "",
         fetch_recent_context(),
         fetch_strategy_notes(),
+        fetch_trading_log(),
         engine.generate_report(),
         fetch_account_summary(),
     ]

@@ -404,114 +404,91 @@ class DataEngine:
                 lines.append(f"- 当前: {oi:.0f} 张")
                 lines.append("")
 
-            # ── 各时间框架指标 ──
+            # ── 各时间框架指标（紧凑格式）──
             for tf in ["1D", "4H", "1H", "15m"]:  # 大→小
                 df = self._candles.get(pair, {}).get(tf)
                 if df is None or df.empty:
                     continue
 
                 last = df.iloc[-1]
-                lines.append(f"### {tf} 指标 (最近一根)")
-                lines.append(f"- OHLCV: O={last['open']:.2f} H={last['high']:.2f} L={last['low']:.2f} C={last['close']:.2f} V={last['vol']:.0f}")
+                lines.append(f"### {tf}")
+                lines.append(f"O={last['open']:.1f} H={last['high']:.1f} L={last['low']:.1f} C={last['close']:.1f} V={last['vol']:.0f}")
 
-                # EMA
-                ema_parts = []
+                # 均线 (EMA + SMA 合并一行)
+                ma_parts = []
                 for p in EMA_PERIODS:
                     key = f"ema{p}"
                     if key in last and pd.notna(last[key]):
-                        ema_parts.append(f"EMA{p}={last[key]:.2f}")
-                if ema_parts:
-                    lines.append(f"- EMA: {', '.join(ema_parts)}")
-
-                # SMA
-                sma_parts = []
+                        ma_parts.append(f"E{p}={last[key]:.1f}")
                 for p in [50, 200]:
                     key = f"sma{p}"
                     if key in last and pd.notna(last[key]):
-                        sma_parts.append(f"SMA{p}={last[key]:.2f}")
-                if sma_parts:
-                    lines.append(f"- SMA: {', '.join(sma_parts)}")
+                        ma_parts.append(f"S{p}={last[key]:.1f}")
+                if ma_parts:
+                    lines.append(f"MA: {' '.join(ma_parts)}")
 
-                # MACD
-                macd_cols = [c for c in df.columns if c.startswith("MACD")]
-                if macd_cols:
-                    macd_parts = []
-                    for col in macd_cols:
-                        if pd.notna(last.get(col)):
-                            label = col.split("_")[0] if "_" not in col else col
-                            macd_parts.append(f"{col}={last[col]:.2f}")
-                    if macd_parts:
-                        lines.append(f"- MACD: {', '.join(macd_parts)}")
+                # MACD 一行
+                macd_line = last.get("MACD_12_26_9")
+                macd_hist = last.get("MACDh_12_26_9")
+                macd_sig = last.get("MACDs_12_26_9")
+                if macd_line is not None and pd.notna(macd_line):
+                    lines.append(f"MACD={macd_line:.1f} Hist={macd_hist:.1f} Sig={macd_sig:.1f}")
 
-                # RSI
+                # RSI + MFI + Stoch 合并一行
+                momentum = []
                 if "rsi14" in last and pd.notna(last["rsi14"]):
-                    lines.append(f"- RSI(14): {last['rsi14']:.1f}")
+                    momentum.append(f"RSI={last['rsi14']:.0f}")
+                if "mfi14" in last and pd.notna(last["mfi14"]):
+                    momentum.append(f"MFI={last['mfi14']:.0f}")
+                stk = [c for c in df.columns if c.startswith("STOCHk")]
+                std = [c for c in df.columns if c.startswith("STOCHd")]
+                if stk and pd.notna(last.get(stk[0])):
+                    momentum.append(f"StochK={last[stk[0]]:.0f}")
+                if std and pd.notna(last.get(std[0])):
+                    momentum.append(f"StochD={last[std[0]]:.0f}")
+                if momentum:
+                    lines.append(f"动量: {' '.join(momentum)}")
 
-                # ATR
+                # ATR + ADX + 量比 合并一行
+                vol_trend = []
                 if "atr14" in last and pd.notna(last["atr14"]):
                     atr_pct = last["atr14"] / last["close"] * 100
-                    lines.append(f"- ATR(14): {last['atr14']:.2f} ({atr_pct:.2f}%)")
-
-                # 布林带
-                bb_cols = [c for c in df.columns if c.startswith("BB")]
-                if bb_cols:
-                    bb_parts = []
-                    for col in sorted(bb_cols):
-                        if pd.notna(last.get(col)):
-                            bb_parts.append(f"{col}={last[col]:.2f}")
-                    if bb_parts:
-                        lines.append(f"- 布林带: {', '.join(bb_parts)}")
-
-                # OBV
-                if "obv" in last and pd.notna(last["obv"]):
-                    lines.append(f"- OBV: {last['obv']:.0f}")
-
-                # 量比
+                    vol_trend.append(f"ATR={last['atr14']:.1f}({atr_pct:.1f}%)")
+                adx_col = [c for c in df.columns if c == "ADX_14" or (c.startswith("ADX") and "R" not in c)]
+                if adx_col and pd.notna(last.get(adx_col[0])):
+                    vol_trend.append(f"ADX={last[adx_col[0]]:.0f}")
                 if "vol_ratio" in last and pd.notna(last["vol_ratio"]):
-                    lines.append(f"- 量比: {last['vol_ratio']:.2f}")
+                    vol_trend.append(f"量比={last['vol_ratio']:.2f}")
+                if vol_trend:
+                    lines.append(f"波动: {' '.join(vol_trend)}")
 
-                # ADX
-                adx_cols = [c for c in df.columns if c.startswith("ADX") or c.startswith("DM")]
-                if adx_cols:
-                    adx_parts = []
-                    for col in adx_cols:
-                        if pd.notna(last.get(col)):
-                            adx_parts.append(f"{col}={last[col]:.1f}")
-                    if adx_parts:
-                        lines.append(f"- ADX: {', '.join(adx_parts)}")
+                # 布林带 → 上下轨 + 位置
+                bbp = last.get("BBP_20_2.0")
+                bbl = last.get("BBL_20_2.0")
+                bbu = last.get("BBU_20_2.0")
+                if bbp is not None and pd.notna(bbp):
+                    lines.append(f"BB: {bbl:.1f}~{bbu:.1f} 位置={bbp:.0%}")
 
-                # SuperTrend
-                st_cols = [c for c in df.columns if "SUPERT" in c.upper()]
-                if st_cols:
-                    st_parts = []
-                    for col in st_cols:
-                        if pd.notna(last.get(col)):
-                            st_parts.append(f"{col}={last[col]:.2f}")
-                    if st_parts:
-                        lines.append(f"- SuperTrend: {', '.join(st_parts)}")
+                # OBV + SuperTrend 合并
+                extras = []
+                if "obv" in last and pd.notna(last["obv"]):
+                    extras.append(f"OBV={last['obv']:.0f}")
+                st_d = [c for c in df.columns if c.startswith("SUPERTd")]
+                if st_d and pd.notna(last.get(st_d[0])):
+                    direction = "▲多" if last[st_d[0]] > 0 else "▼空"
+                    st_val = [c for c in df.columns if c.startswith("SUPERT_")]
+                    val = f"={last[st_val[0]]:.1f}" if st_val and pd.notna(last.get(st_val[0])) else ""
+                    extras.append(f"ST:{direction}{val}")
+                if extras:
+                    lines.append(f"{' | '.join(extras)}")
 
-                # Stochastic
-                stoch_cols = [c for c in df.columns if c.startswith("STOCHk") or c.startswith("STOCHd")]
-                if stoch_cols:
-                    stoch_parts = []
-                    for col in stoch_cols:
-                        if pd.notna(last.get(col)):
-                            stoch_parts.append(f"{col}={last[col]:.1f}")
-                    if stoch_parts:
-                        lines.append(f"- Stochastic: {', '.join(stoch_parts)}")
-
-                # MFI
-                if "mfi14" in last and pd.notna(last["mfi14"]):
-                    lines.append(f"- MFI(14): {last['mfi14']:.1f}")
-
-                # 近10根K线摘要 (趋势判断用)
+                # 近10根K线 (收盘+高低)
                 recent = df.tail(10)
-                closes = recent["close"].tolist()
-                highs = recent["high"].tolist()
-                lows = recent["low"].tolist()
-                lines.append(f"- 近10根收盘: {[round(x, 2) for x in closes]}")
-                lines.append(f"- 近10根最高: {[round(x, 2) for x in highs]}")
-                lines.append(f"- 近10根最低: {[round(x, 2) for x in lows]}")
+                closes = [round(x, 1) for x in recent["close"].tolist()]
+                highs = [round(x, 1) for x in recent["high"].tolist()]
+                lows = [round(x, 1) for x in recent["low"].tolist()]
+                lines.append(f"近10C: {closes}")
+                lines.append(f"近10H: {highs} L: {lows}")
                 lines.append("")
 
             lines.append("---")
