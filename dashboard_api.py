@@ -3,6 +3,7 @@ AI 自主交易员 — Dashboard API
 提供 JSON 数据给前端页面
 """
 import json
+import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from trade_db import get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds, get_reviews, get_trades_paged
@@ -12,6 +13,8 @@ import sqlite3
 import urllib.request
 
 DB_PATH = Path(__file__).parent / "trades.db"
+_price_cache = {}
+_price_cache_time = 0
 MEMORY_DIR = Path.home() / ".claude/projects/-Users-crypto/memory"
 PORT = 8888
 
@@ -92,7 +95,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         return [dict(r) for r in rows]
 
     def _get_prices(self):
-        """从 OKX 公共 API 实时拉取 BTC/ETH 价格（自动匹配模拟/实盘）"""
+        """从 OKX 公共 API 实时拉取 BTC/ETH 价格（自动匹配模拟/实盘），60秒缓存"""
+        global _price_cache, _price_cache_time
+        if _price_cache and time.time() - _price_cache_time < 60:
+            return _price_cache
         result = {"btc": {}, "eth": {}}
         _headers = {"User-Agent": "Mozilla/5.0"}
         if OKX_DEMO:
@@ -134,6 +140,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     result[key]["funding"] = fr
         except Exception:
             pass
+        _price_cache = result
+        _price_cache_time = time.time()
         return result
 
     def _get_today(self):

@@ -12,10 +12,11 @@
    自动匹配模拟盘/实盘（读 config.py 的 OKX_DEMO）
    报告保存在 latest_report.txt
 
-   同时用 MCP 查（并行）:
-   - account_get_balance(ccy=USDT) → 获取最新权益
-   - swap_get_positions() → 确认链上持仓
-   - swap_get_orders(status=open) → 检查未成交挂单
+   同时用 MCP 查（按需调用，省 token）:
+   - account_get_balance(ccy=USDT) → **每轮必查**
+   - swap_get_positions() → **当 trade_db 有 open 记录时必查**（确认链上状态、检测止损止盈是否已触发）
+   - swap_get_orders(status=open) → **当 trade_db 有 open 记录时必查**（检查挂单状态）
+   - trade_db 无 open 记录时只查 balance，省 ~1000 token/轮
 
 2. **处理上轮遗留 + 持仓风险评估**
    - 有未成交限价单 → 撤掉 (swap_cancel_order)
@@ -24,7 +25,7 @@
      b. 用当前最新数据重新分析：**开仓时的逻辑还成立吗？**
      c. 如果不成立 → **主动平仓**（不等止损触发）
      d. 主动平仓用：swap_close_position 或 swap_place_order(市价, reduceOnly)
-     e. 同时撤掉该持仓的止盈止损挂单 (swap_cancel_algo_orders)
+     e. **⚠️ 必须撤掉该持仓的止盈止损挂单 (swap_cancel_algo_orders)**——如果忘记，旧的 SL/TP 挂单可能在手动平仓后触发，导致意外开出新仓位
      f. 记录 close_reason = "AI主动平仓: <具体原因>"
      ※ AI 自行判断什么算"不成立"，不硬编码具体指标
 
@@ -33,8 +34,8 @@
    - trading-log.md（最近5笔的教训）
 
 4. **判断是否该复盘**（先检查再交易）
-   - 每天 UTC 00:00 附近的那轮 → 执行每日复盘
-   - 每周一 UTC 00:00 附近的那轮 → 执行每周复盘
+   - 每天第一轮执行时间在 UTC 00:00 ~ 01:00 之间时 → 执行每日复盘
+   - 每周一第一轮在 UTC 00:00 ~ 01:00 之间时 → 执行每周复盘
    - 其他时间 → 跳过，正常交易
 
 5. **按 ai-trader-prompt.md 分析决策**
@@ -51,6 +52,7 @@
 7. **执行**
    - hold → 不操作
    - 开仓 → swap_set_leverage + swap_place_order(限价+止损止盈)
+     - 限价单如果下轮仍未成交 → 下轮步骤2会自动撤掉重新评估
    - 平仓 → swap_close_position 或 swap_place_order(reduceOnly)
 
 8. **记录**

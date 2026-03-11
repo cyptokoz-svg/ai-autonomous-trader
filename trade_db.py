@@ -31,7 +31,9 @@ def init_db():
             action TEXT NOT NULL,
             side TEXT,
             entry_price REAL,
+            actual_entry_price REAL,
             exit_price REAL,
+            actual_exit_price REAL,
             sheets INTEGER,
             leverage INTEGER,
             position_size_pct REAL,
@@ -95,6 +97,13 @@ def init_db():
             key_findings TEXT
         );
         """)
+        # Add new columns if missing (backwards compat)
+        for col, coltype in [("actual_entry_price", "REAL"), ("actual_exit_price", "REAL")]:
+            try:
+                conn.execute(f"ALTER TABLE trades ADD COLUMN {col} {coltype}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -108,27 +117,28 @@ def record_open(
     entry_type: str, stop_loss: float, stop_loss_method: str,
     take_profit: float, take_profit_method: str,
     confidence: float, risk_usd: float, risk_reward_ratio: float,
-    indicators_used: list, reasoning: dict, market_state: str,
+    indicators_used: str, reasoning: dict, market_state: str,
     order_id: str = "",
+    actual_entry_price: float = 0,
 ) -> int:
     """记录开仓"""
     conn = get_conn()
     try:
         cur = conn.execute("""
             INSERT INTO trades (
-                timestamp, coin, action, side, entry_price, sheets,
+                timestamp, coin, action, side, entry_price, actual_entry_price, sheets,
                 leverage, position_size_pct, entry_type,
                 stop_loss, stop_loss_method, take_profit, take_profit_method,
                 confidence, risk_usd, risk_reward_ratio,
                 indicators_used, reasoning, market_state, order_id, status
-            ) VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+            ) VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
         """, (
             datetime.now(timezone.utc).isoformat(),
-            coin, side, entry_price, sheets,
+            coin, side, entry_price, actual_entry_price, sheets,
             leverage, position_size_pct, entry_type,
             stop_loss, stop_loss_method, take_profit, take_profit_method,
             confidence, risk_usd, risk_reward_ratio,
-            json.dumps(indicators_used, ensure_ascii=False),
+            indicators_used,
             json.dumps(reasoning, ensure_ascii=False),
             market_state, order_id,
         ))
@@ -146,17 +156,18 @@ def record_open(
 def record_close(
     trade_id: int, exit_price: float, pnl: float, pnl_pct: float,
     duration_min: float, close_reason: str, lessons: str = "",
+    actual_exit_price: float = 0,
 ):
     """记录平仓"""
     conn = get_conn()
     try:
         conn.execute("""
             UPDATE trades SET
-                exit_price = ?, pnl = ?, pnl_pct = ?,
+                exit_price = ?, actual_exit_price = ?, pnl = ?, pnl_pct = ?,
                 duration_min = ?, close_reason = ?,
                 lessons = ?, status = 'closed'
             WHERE id = ?
-        """, (exit_price, pnl, pnl_pct, duration_min, close_reason, lessons, trade_id))
+        """, (exit_price, actual_exit_price, pnl, pnl_pct, duration_min, close_reason, lessons, trade_id))
         conn.commit()
     except Exception as e:
         conn.rollback()

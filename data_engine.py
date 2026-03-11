@@ -42,6 +42,7 @@ class DataEngine:
         self._oi: dict[str, float] = {}
         self._ticker: dict[str, dict] = {}
         self._orderbook: dict[str, dict] = {}
+        self._long_short_ratio: dict[str, dict] = {}
 
         self._initialized = False
 
@@ -80,6 +81,7 @@ class DataEngine:
                     tasks.append(asyncio.ensure_future(self._safe_fetch_oi(session, pair)))
                     tasks.append(asyncio.ensure_future(self._safe_fetch_ticker(session, pair)))
                     tasks.append(asyncio.ensure_future(self._safe_fetch_orderbook(session, pair)))
+                    tasks.append(asyncio.ensure_future(self._safe_fetch_long_short_ratio(session, pair)))
 
                     for tf, tf_cfg in self.timeframes.items():
                         last = self._last_refresh.get(pair, {}).get(tf, 0)
@@ -270,6 +272,21 @@ class DataEngine:
             result["history"] = rates
             result["avg_rate"] = sum(rates) / len(rates) if rates else 0.0
 
+            # 趋势: 取最近5期 (history 按时间倒序, 反转后从旧到新)
+            recent_5 = list(reversed(rates[:5])) if len(rates) >= 5 else list(reversed(rates))
+            if len(recent_5) >= 2:
+                diffs = [recent_5[i+1] - recent_5[i] for i in range(len(recent_5) - 1)]
+                rising = sum(1 for d in diffs if d > 0)
+                falling = sum(1 for d in diffs if d < 0)
+                if rising > falling:
+                    result["trend"] = "rising"
+                elif falling > rising:
+                    result["trend"] = "falling"
+                else:
+                    result["trend"] = "flat"
+            else:
+                result["trend"] = "flat"
+
         return result
 
     async def _safe_fetch_funding(self, session, pair):
@@ -277,6 +294,31 @@ class DataEngine:
             self._funding[pair] = await self.fetch_funding_rate(session, pair)
         except Exception as e:
             logger.error("fetch_funding %s 异常: %s", pair, e)
+
+    # ──────────────────── Long/Short Ratio ────────────────────
+
+    async def fetch_long_short_ratio(self, session: aiohttp.ClientSession, pair: str) -> dict:
+        """获取多空持仓人数比（用 ccy 参数，如 BTC）."""
+        url = f"{self.base_url}/api/v5/rubik/stat/contracts/long-short-account-ratio"
+        ccy = pair.split("-")[0]  # BTC-USDT-SWAP -> BTC
+        params = {"ccy": ccy, "period": "1H"}
+        async with session.get(url, params=params) as resp:
+            data = await resp.json()
+        if data.get("code") == "0" and data.get("data") and len(data["data"]) > 0:
+            latest = data["data"][0]
+            ratio = float(latest[1]) if len(latest) > 1 else 1.0
+            # ratio > 1 表示多头人数多，< 1 表示空头人数多
+            return {
+                "ratio": ratio,
+                "period": "1H",
+            }
+        return {}
+
+    async def _safe_fetch_long_short_ratio(self, session, pair):
+        try:
+            self._long_short_ratio[pair] = await self.fetch_long_short_ratio(session, pair)
+        except Exception as e:
+            logger.error("fetch_long_short_ratio %s 异常: %s", pair, e)
 
     # ──────────────────── Open Interest ────────────────────
 
@@ -391,10 +433,22 @@ class DataEngine:
             # ── 资金费率 ──
             fr = self._funding.get(pair, {})
             if fr:
+                trend = fr.get("trend", "flat")
+                trend_label = {"rising": "连续上升", "falling": "连续下降", "flat": "持平"}
                 lines.append(f"### 资金费率")
                 lines.append(f"- 当前: {fr.get('current_rate', 0):.6f}")
                 lines.append(f"- 预测下期: {fr.get('next_rate', 0):.6f}")
                 lines.append(f"- 近30期均值: {fr.get('avg_rate', 0):.6f}")
+                lines.append(f"- 趋势: {trend_label.get(trend, trend)} ({trend})")
+                lines.append("")
+
+            # ── 多空持仓比 ──
+            ls = self._long_short_ratio.get(pair, {})
+            if ls and ls.get("ratio"):
+                r = ls["ratio"]
+                bias = "多头偏多" if r > 1.1 else "空头偏多" if r < 0.9 else "均衡"
+                lines.append(f"### 多空持仓比")
+                lines.append(f"- {ls.get('period', '1H')}: {r:.2f} ({bias})")
                 lines.append("")
 
             # ── 持仓量 ──

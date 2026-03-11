@@ -123,7 +123,7 @@ position_size_pct = sheets × 合约面值 × 入场价 / (权益 × 杠杆)
   "confidence": 0.72,
   "risk_usd": 65.0,
   "risk_reward_ratio": 1.69,
-  "indicators_used": ["你实际看了哪些指标"],
+  "indicators_used": "EMA+MACD+RSI",
   "reasoning": {
     "market_state": "你对当前市场的判断",
     "direction": "你看多/看空/看不清的理由",

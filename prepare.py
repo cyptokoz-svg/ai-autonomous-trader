@@ -2,12 +2,14 @@
 AI 自主交易员 — 数据准备（一键拉取）
 合并 data_engine + stats + 账户信息，一次输出完整报告
 自动匹配模拟盘/实盘
+智能控制报告体积：有持仓=详细模式，无持仓=精简模式
 
 用法: python3 prepare.py
 输出: latest_report.txt（AI 直接读取决策）
 """
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
 
 from pathlib import Path
@@ -16,80 +18,98 @@ from data_engine import DataEngine
 from trade_db import get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds
 
 MEMORY_DIR = Path.home() / ".claude/projects/-Users-crypto/memory"
+STATE_FILE = Path(__file__).parent / ".last_report_state.json"
 
 
-def fetch_account_summary() -> str:
-    """通过 trades.db 获取账户摘要（余额由 MCP 查，这里只出统计）"""
+def _load_last_state() -> dict:
+    """读取上轮状态（用于增量判断）"""
+    try:
+        if STATE_FILE.exists():
+            return json.loads(STATE_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+
+def _save_state(state: dict):
+    """保存本轮状态"""
+    try:
+        STATE_FILE.write_text(json.dumps(state))
+    except Exception:
+        pass
+
+
+def _file_changed(path: Path, last_state: dict) -> bool:
+    """检查文件是否有变化（基于修改时间）"""
+    if not path.exists():
+        return False
+    mtime = os.path.getmtime(path)
+    return mtime != last_state.get(str(path), 0)
+
+
+def fetch_account_summary(has_positions: bool) -> str:
+    """通过 trades.db 获取账户摘要"""
     stats = get_stats()
     open_trades = get_open_trades()
-    recent = get_recent_trades(3)
-    signals = get_signal_stats()
 
-    lines = ["## 账户 & 交易统计", ""]
-    lines.append(f"- 模式: {'模拟盘' if OKX_DEMO else '⚠️ 实盘'}")
-    lines.append("")
+    lines = [f"## 账户 | {'模拟盘' if OKX_DEMO else '⚠️ 实盘'}"]
 
     if stats["total"] == 0:
-        lines.append("暂无已平仓交易记录")
+        lines.append("暂无已平仓记录")
     else:
-        lines.append("### 核心指标")
-        lines.append(f"- 总交易: {stats['total']}笔 (赢{stats['wins']} 亏{stats['losses']})")
-        lines.append(f"- 胜率: {stats['win_rate']:.1%}")
-        lines.append(f"- 总盈亏: ${stats['total_pnl']:.2f}")
-        lines.append(f"- 盈亏因子: {stats['profit_factor']}")
-        lines.append(f"- 最大回撤: ${stats['max_drawdown']:.2f} ({stats['max_drawdown_pct']:.1f}%)")
-        lines.append(f"- 当前连胜/连亏: {stats['current_streak']}")
-        lines.append("")
+        recent = get_recent_trades(3)
+        signals = get_signal_stats()
+        lines.append(f"共{stats['total']}笔 胜率{stats['win_rate']:.0%} "
+                     f"盈亏${stats['total_pnl']:.2f} "
+                     f"盈亏因子{stats['profit_factor']} "
+                     f"回撤{stats['max_drawdown_pct']:.1f}% "
+                     f"连{stats['current_streak']}")
 
         if recent:
-            lines.append("### 最近3笔")
             for t in recent:
                 pnl = t.get("pnl", 0) or 0
-                lines.append(f"- {t['coin']} {t['side']} → ${pnl:+.2f} ({t.get('close_reason', '')})")
-            lines.append("")
+                lines.append(f"  近: {t['coin']} {t['side']} ${pnl:+.2f} ({t.get('close_reason', '')})")
 
-    if open_trades:
-        lines.append(f"### 当前持仓 ({len(open_trades)}个)")
-        for t in open_trades:
-            lines.append(f"- {t['coin']} {t['side']} 入场{t['entry_price']} "
-                         f"SL:{t.get('stop_loss', '--')} TP:{t.get('take_profit', '--')} "
-                         f"杠杆{t.get('leverage', '--')}x {t.get('sheets', '--')}张")
-        lines.append("")
-    else:
-        lines.append("### 当前持仓: 无")
-        lines.append("")
-
-    if signals:
-        top = sorted(signals, key=lambda s: s.get("used_count", 0), reverse=True)[:3]
-        if top:
-            lines.append("### 信号组合 Top 3")
+        if signals:
+            top = sorted(signals, key=lambda s: s.get("used_count", 0), reverse=True)[:3]
             for s in top:
                 wr = s["win_count"] / s["used_count"] * 100 if s["used_count"] else 0
-                lines.append(f"- {s['indicator_combo']}: 用{s['used_count']}次 胜率{wr:.0f}% 盈亏${s['total_pnl']:.2f}")
-            lines.append("")
+                lines.append(f"  信号: {s['indicator_combo']} {s['used_count']}次 {wr:.0f}% ${s['total_pnl']:.2f}")
+
+    if open_trades:
+        lines.append(f"持仓({len(open_trades)}):")
+        for t in open_trades:
+            lines.append(f"  {t['coin']} {t['side']} 入{t['entry_price']} "
+                         f"SL:{t.get('stop_loss', '--')} TP:{t.get('take_profit', '--')} "
+                         f"{t.get('leverage', '--')}x {t.get('sheets', '--')}张")
+    else:
+        lines.append("持仓: 无")
 
     return "\n".join(lines)
 
 
-def fetch_trading_log() -> str:
-    """读取 trading-log.md，最近5笔交易的关键教训"""
+def fetch_trading_log(last_state: dict) -> str:
+    """读取 trading-log.md（仅在文件有变化时输出）"""
     log_path = MEMORY_DIR / "trading-log.md"
+    if not _file_changed(log_path, last_state):
+        return ""
     if not log_path.exists():
         return ""
     content = log_path.read_text().strip()
     if not content or "暂无" in content:
         return ""
-    return f"## 最近交易教训（避免重蹈覆辙）\n\n{content}\n"
+    return f"## 交易教训\n{content}\n"
 
 
-def fetch_strategy_notes() -> str:
-    """读取 strategy-notes.md，AI 的核心经验库"""
+def fetch_strategy_notes(last_state: dict) -> str:
+    """读取 strategy-notes.md（仅在文件有变化时输出完整内容）"""
     notes_path = MEMORY_DIR / "strategy-notes.md"
     if not notes_path.exists():
         return ""
     content = notes_path.read_text().strip()
     if not content:
         return ""
+
     # 检查"当前有效规则"部分是否只有"暂无"
     if "当前有效规则" in content:
         parts = content.split("当前有效规则")
@@ -97,18 +117,24 @@ def fetch_strategy_notes() -> str:
             section = parts[1].split("##")[0] if "##" in parts[1] else parts[1]
             if "暂无" in section and len(section.strip()) < 20:
                 return ""
-    return f"## 你的策略经验（必须参考）\n\n{content}\n"
+
+    # 文件没变化时只输出提醒，不重复全文
+    if not _file_changed(notes_path, last_state):
+        return "## 策略经验: 同上轮，未变化。请继续遵守已有规则。\n"
+
+    return f"## 策略经验（必须参考）\n{content}\n"
 
 
-def fetch_recent_context() -> str:
-    """获取最近几轮的决策摘要，让 AI 知道上轮留下了什么观察"""
-    data = get_recent_rounds(n=5, offset=0)
+def fetch_recent_context(has_positions: bool) -> str:
+    """获取最近几轮的决策摘要"""
+    n = 5 if has_positions else 3
+    data = get_recent_rounds(n=n, offset=0)
     items = data.get("items", [])
     if not items:
         return ""
 
-    lines = ["## 最近轮次记录（你上几轮的决策，请关联）", ""]
-    for r in reversed(items):  # 从旧到新
+    lines = ["## 最近轮次", ""]
+    for r in reversed(items):
         ts = r.get("timestamp", "")[:16]
         action = r.get("action", "")
         summary = r.get("summary", "")
@@ -119,7 +145,7 @@ def fetch_recent_context() -> str:
         if summary:
             lines.append(f"  > {summary}")
     lines.append("")
-    lines.append("⚠️ 如果上轮提到了要关注的价位/信号/条件，本轮必须跟进检查是否成立。")
+    lines.append("⚠️ 上轮提到的价位/信号/条件，本轮必须跟进。")
     lines.append("")
     return "\n".join(lines)
 
@@ -129,8 +155,13 @@ async def main():
     print(f"[{mode}] 正在拉取数据...")
 
     report_path = Path(__file__).parent / "latest_report.txt"
+    last_state = _load_last_state()
 
-    # 并行: 行情数据 + 统计
+    # 检查是否有持仓
+    open_trades = get_open_trades()
+    has_positions = len(open_trades) > 0
+
+    # 拉行情数据
     engine = DataEngine()
     try:
         await engine.update()
@@ -140,20 +171,19 @@ async def main():
     if not engine.is_ready:
         print("❌ 数据未就绪，请检查网络")
         if report_path.exists():
-            print(f"⚠️ latest_report.txt 是旧数据，请注意！")
+            print("⚠️ latest_report.txt 是旧数据，请注意！")
         return
 
     # 合并报告
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     parts = [
-        f"# AI 交易员数据报告 — {now_str}",
-        f"# 模式: {mode}",
+        f"# AI 交易员数据报告 — {now_str} | {mode}",
         "",
-        fetch_recent_context(),
-        fetch_strategy_notes(),
-        fetch_trading_log(),
+        fetch_recent_context(has_positions),
+        fetch_strategy_notes(last_state),
+        fetch_trading_log(last_state),
         engine.generate_report(),
-        fetch_account_summary(),
+        fetch_account_summary(has_positions),
     ]
     report = "\n".join(parts)
 
@@ -163,6 +193,14 @@ async def main():
     except IOError as e:
         print(f"❌ 写入报告失败: {e}")
         return
+
+    # 保存本轮状态（记忆文件的 mtime）
+    new_state = {}
+    for name in ["strategy-notes.md", "trading-log.md"]:
+        p = MEMORY_DIR / name
+        if p.exists():
+            new_state[str(p)] = os.path.getmtime(p)
+    _save_state(new_state)
 
     # 打印摘要
     for pair in engine.pairs:
