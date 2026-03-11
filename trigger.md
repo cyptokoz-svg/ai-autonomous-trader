@@ -70,6 +70,13 @@
      ```
    - 有新经验/发现 → 更新 strategy-notes.md（直接编辑文件）
    - 重要：strategy-notes.md 的更新会出现在下一轮的 latest_report.txt 中
+   - **同步 Claude 记忆**（每次平仓后必做）：
+     ```bash
+     cd ~/Desktop/ai-autonomous-trader && python3 stats.py --update
+     ```
+     自动从 trades.db 生成 → performance.md + signal-scores.md
+     然后手动更新 trading-log.md（只保留最近5笔教训）
+     这些文件是 Claude 跨会话的持久记忆，新对话会自动读取
 
 ---
 
@@ -111,7 +118,16 @@
      - "观察中" → 加入还需验证的新发现
    - 更新 signal_stats 表（通过 trade_db.update_signal_stat）
 
-7. **记录复盘到数据库**
+7. **同步 Claude 记忆系统**（每日复盘必做）
+   将 trades.db 的量化数据回写到 Claude 持久记忆，确保新会话也能继承学习成果：
+   - `~/.claude/projects/-Users-crypto/memory/signal-scores.md` ← signal_stats 表最新数据
+   - `~/.claude/projects/-Users-crypto/memory/performance.md` ← 更新核心指标（胜率、盈亏、回撤等）
+   - `~/.claude/projects/-Users-crypto/memory/trading-log.md` ← 最近5笔教训
+   - `~/.claude/projects/-Users-crypto/memory/strategy-notes.md` ← 步骤6已更新
+
+   **原则：DB 是数据源，记忆文件是 DB 的人类可读摘要。DB 增删 → 记忆文件同步增删。**
+
+8. **记录复盘到数据库**
    ```python
    from trade_db import record_review
    record_review("daily", "<完整复盘内容>", stats_snapshot="<今日统计>", key_findings="<关键发现>")
@@ -158,11 +174,114 @@
    - 重点关注什么信号？
    - 有没有要调整的策略方向？
 
-6. **记录复盘到数据库**
+6. **同步 Claude 记忆系统**（每周复盘是大同步）
+   全量刷新所有记忆文件，确保 Claude 认知与系统数据完全一致：
+   - `signal-scores.md` ← signal_stats 全表（含本周淘汰/晋升标注）
+   - `performance.md` ← 累计统计 + 本周 vs 上周对比
+   - `strategy-notes.md` ← 步骤4已更新（规则晋升/淘汰/新假设）
+   - `trading-log.md` ← 最近5笔教训
+   - 如果有重大策略转向 → 更新 `MEMORY.md` 的 AI 自主交易员条目
+
+7. **记录复盘到数据库**
    ```python
    from trade_db import record_review
    record_review("weekly", "<完整复盘内容>", stats_snapshot="<本周统计>", key_findings="<策略变更清单>")
    ```
+
+---
+
+## 9. 生成实时监控条件
+
+每轮结束后，根据你本轮的分析，生成 `watch_condition.py` 文件。
+watcher.py 会常驻运行，每 10 秒拉一次价格，调用你写的 `check()` 函数。
+条件满足时会自动触发下一轮 `prepare.py + claude -p trigger.md`。
+
+**你需要写一个 Python 文件，格式如下：**
+
+```python
+# watch_condition.py
+"""<一句话描述监控条件>"""
+
+def check(prices, history):
+    """
+    prices: {"btc": 70000.0, "eth": 2180.0}  -- 实时价格
+    history: {"btc": deque([{price, vol24h, high24h, low24h, open24h, ts}, ...]), ...}
+             -- 最近1小时的 tick 数据（每10秒一条，最多360条）
+
+    返回: (triggered: bool, reason: str)
+    triggered=True 时触发交易轮次
+    """
+    # 你的逻辑...
+    return False, ""
+```
+
+**示例 — 突破/跌破关键位：**
+```python
+"""BTC 突破 71000 或跌破 67770"""
+def check(prices, history):
+    if prices["btc"] > 71000:
+        return True, "BTC 突破 71000 阻力位"
+    if prices["btc"] < 67770:
+        return True, "BTC 跌破 67770 支撑位"
+    return False, ""
+```
+
+**示例 — 站稳确认（需要持续一段时间）：**
+```python
+"""ETH 站稳 2190 超过 5 分钟"""
+import time
+def check(prices, history):
+    if prices["eth"] < 2190:
+        return False, ""
+    eth_hist = history.get("eth", [])
+    if not eth_hist:
+        return False, ""
+    for tick in reversed(list(eth_hist)):
+        if tick["price"] < 2190:
+            if time.time() - tick["ts"] >= 300:
+                return True, "ETH 站稳 2190 超过 5 分钟"
+            return False, ""
+    # 历史数据内全部在 2190 以上
+    oldest = list(eth_hist)[0]
+    if time.time() - oldest["ts"] >= 300:
+        return True, "ETH 站稳 2190 超过 5 分钟"
+    return False, ""
+```
+
+**示例 — 放量异动：**
+```python
+"""BTC 5分钟内涨跌超1%且放量"""
+import time
+def check(prices, history):
+    btc_hist = list(history.get("btc", []))
+    if len(btc_hist) < 30:
+        return False, ""
+    p_5m = [t for t in btc_hist if time.time() - t["ts"] <= 300]
+    if not p_5m:
+        return False, ""
+    old_price = p_5m[0]["price"]
+    pct = (prices["btc"] - old_price) / old_price * 100
+    avg_vol = sum(t["vol24h"] for t in btc_hist[-60:]) / len(btc_hist[-60:])
+    cur_vol = btc_hist[-1]["vol24h"]
+    if abs(pct) >= 1.0 and cur_vol > avg_vol * 1.5:
+        return True, f"BTC {pct:+.2f}% 放量异动"
+    return False, ""
+```
+
+**规则：**
+- 必须有 `check(prices, history)` 函数，返回 `(bool, str)`
+- 条件要具体，基于你本轮分析的关键价位/信号
+- 如果本轮判断市场无方向、无需监控，写一个永远返回 False 的 check
+- 文件顶部的 docstring 会被 watcher 打印在日志中
+- 触发后有 10 分钟冷却期，不会重复触发
+- 每轮会覆盖此文件，所以写当前最需要监控的条件即可
+
+**写入方式：**
+```bash
+cat > ~/ai-autonomous-trader/watch_condition.py << 'PYEOF'
+# 你的代码
+PYEOF
+```
 
 ---
 

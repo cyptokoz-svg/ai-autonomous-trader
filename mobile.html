@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI Trader">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a0f' width='100' height='100' rx='20'/><text y='68' x='50' text-anchor='middle' font-size='50'>🤖</text></svg>">
+<title>AI Trader</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0a0f;--bg2:#111118;--bg3:#1a1a28;--border:#1c1c2c;
+    --text:#e0e0e0;--dim:#6b7280;
+    --green:#00d4aa;--green-bg:rgba(0,212,170,0.1);
+    --red:#ff4757;--red-bg:rgba(255,71,87,0.1);
+    --blue:#4a9eff;--blue-bg:rgba(74,158,255,0.1);
+    --purple:#a855f7;--purple-bg:rgba(168,85,247,0.1);
+    --yellow:#fbbf24;
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);
+    min-height:100vh;min-height:100dvh;overflow-x:hidden;
+    padding-bottom:calc(60px + var(--safe-b));
+  }
+
+  /* ── Pull to Refresh ── */
+  .ptr-indicator{text-align:center;padding:12px;color:var(--dim);font-size:0.8em;display:none}
+  .ptr-indicator.show{display:block}
+
+  /* ── Top Price Bar ── */
+  .price-bar{
+    position:sticky;top:0;z-index:100;
+    background:rgba(10,10,15,0.92);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-around;align-items:center;
+    padding:8px 12px;
+    font-family:'JetBrains Mono',monospace;font-size:0.75em;
+  }
+  .price-item{text-align:center}
+  .price-item .name{color:var(--dim);font-size:0.85em;margin-bottom:2px}
+  .price-item .price{font-weight:700;font-size:1.1em}
+  .price-item .change{font-size:0.9em}
+  .positive{color:var(--green)}.negative{color:var(--red)}
+
+  /* ── Mode Badge ── */
+  .mode-bar{
+    display:flex;justify-content:center;align-items:center;gap:8px;
+    padding:6px;font-size:0.7em;color:var(--dim);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .mode-badge{padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:1px}
+  .mode-demo{background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.4);color:var(--blue)}
+  .mode-live{background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.4);color:var(--red)}
+
+  /* ── Page Container ── */
+  .page{display:none;padding:12px 14px 20px;animation:fadeIn 0.2s}
+  .page.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ── Stats Cards ── */
+  .stats-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .stat{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .stat .label{font-size:0.65em;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+  .stat .val{font-size:1.4em;font-weight:700;font-family:'JetBrains Mono',monospace}
+  .stat .sub{font-size:0.7em;color:var(--dim);margin-top:2px}
+  .stat-wide{grid-column:1/-1}
+
+  /* ── Section Title ── */
+  .sec-title{font-size:0.75em;color:var(--dim);text-transform:uppercase;letter-spacing:1px;
+    margin:18px 0 10px;font-weight:600;display:flex;align-items:center;gap:6px}
+
+  /* ── Card ── */
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px}
+
+  /* ── Position Cards ── */
+  .pos-card{padding:14px;border-bottom:1px solid var(--border)}
+  .pos-card:last-child{border-bottom:none}
+  .pos-card.long{border-left:3px solid var(--green);background:linear-gradient(90deg,rgba(0,212,170,0.06),transparent)}
+  .pos-card.short{border-left:3px solid var(--red);background:linear-gradient(90deg,rgba(255,71,87,0.06),transparent)}
+  .pos-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .pos-coin{font-weight:700;font-size:1.05em}
+  .pos-badge{padding:2px 8px;border-radius:4px;font-size:0.7em;font-weight:700;font-family:'JetBrains Mono',monospace}
+  .pos-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.78em;font-family:'JetBrains Mono',monospace}
+  .pos-grid .k{color:var(--dim)}.pos-grid .v{text-align:right;font-weight:600}
+
+  /* ── Round Log ── */
+  .round-card{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+  .round-card:last-child{border-bottom:none}
+  .round-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .round-time{color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:0.72em}
+  .round-action{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.78em}
+  .round-action.hold{color:var(--dim)}.round-action.open{color:var(--green)}
+  .round-action.close{color:var(--yellow)}.round-action.review{color:var(--purple)}
+  .round-summary{color:var(--dim);font-size:0.78em;line-height:1.5;overflow:hidden;
+    text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .round-card.expanded .round-summary{-webkit-line-clamp:unset}
+  .round-detail{display:none;margin-top:8px;padding:10px;background:rgba(255,255,255,0.02);
+    border-radius:6px;border-left:2px solid var(--blue);font-size:0.78em;color:var(--text);
+    line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .round-card.expanded .round-detail{display:block}
+  .round-prices{font-family:'JetBrains Mono',monospace;font-size:0.7em;color:var(--dim)}
+
+  /* ── Trade Items ── */
+  .trade-card{padding:12px 14px;border-bottom:1px solid var(--border)}
+  .trade-card:last-child{border-bottom:none}
+  .trade-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .trade-coin{font-weight:700;font-size:0.95em;display:flex;align-items:center;gap:6px}
+  .trade-pnl{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.9em}
+  .trade-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.72em;color:var(--dim);
+    font-family:'JetBrains Mono',monospace}
+
+  /* ── AI Reasoning ── */
+  .reason-card{padding:14px;border-bottom:1px solid var(--border)}
+  .reason-card:last-child{border-bottom:none}
+  .reason-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .reason-info{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:0.82em;display:flex;align-items:center;gap:6px}
+  .reason-body{font-size:0.78em;line-height:1.7;color:var(--dim);border-left:2px solid var(--border);padding-left:10px}
+  .field{margin-bottom:4px}
+  .field-label{color:var(--purple);font-weight:500}
+  .indicator-tag{background:var(--purple-bg);color:var(--purple);padding:1px 6px;border-radius:3px;
+    font-size:0.7em;font-family:'JetBrains Mono',monospace;display:inline-block;margin:2px}
+  .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:0.7em;font-weight:700}
+  .badge-long{background:var(--green-bg);color:var(--green)}
+  .badge-short{background:var(--red-bg);color:var(--red)}
+  .badge-open{background:var(--blue-bg);color:var(--blue)}
+
+  /* ── Strategy Notes ── */
+  .notes-body{padding:14px;font-size:0.8em;line-height:1.7;color:var(--dim)}
+  .notes-body h1,.notes-body h2,.notes-body h3{color:var(--text);margin:10px 0 6px}
+  .notes-body h1{font-size:1.1em}.notes-body h2{font-size:1em}.notes-body h3{font-size:0.9em}
+  .notes-body strong{color:var(--text)}.notes-body code{background:var(--bg3);padding:1px 4px;border-radius:3px;color:var(--green);font-size:0.9em}
+  .notes-body ul{padding-left:18px;margin:4px 0}.notes-body li{margin:2px 0}
+
+  /* ── Signals ── */
+  .signal-item{padding:12px 14px;border-bottom:1px solid var(--border)}
+  .signal-item:last-child{border-bottom:none}
+  .signal-combo{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-weight:600;font-size:0.85em}
+  .wr-badge{font-family:'JetBrains Mono',monospace;font-size:0.8em;font-weight:700}
+  .signal-info{font-size:0.72em;color:var(--dim);font-family:'JetBrains Mono',monospace}
+  .signal-bar{height:3px;background:var(--border);border-radius:2px;margin-top:6px}
+  .signal-bar-fill{height:100%;border-radius:2px;transition:width 0.3s}
+
+  /* ── Today Summary ── */
+  .today-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .today-item{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+  .today-item .tl{font-size:0.6em;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+  .today-item .tv{font-size:1.2em;font-weight:700;font-family:'JetBrains Mono',monospace;margin-top:2px}
+
+  /* ── Pager ── */
+  .pager{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;
+    border-top:1px solid var(--border);font-size:0.7em;color:var(--dim);font-family:'JetBrains Mono',monospace}
+  .pager-btns{display:flex;gap:6px}
+  .pager-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);
+    padding:6px 14px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:1em;cursor:pointer}
+  .pager-btn:disabled{opacity:0.3}
+
+  /* ── Empty ── */
+  .empty{padding:30px;text-align:center;color:var(--dim);font-size:0.82em}
+
+  /* ── Bottom Nav ── */
+  .bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;z-index:100;
+    background:rgba(10,10,15,0.95);backdrop-filter:blur(12px);
+    border-top:1px solid var(--border);
+    display:flex;justify-content:space-around;align-items:center;
+    padding:6px 0 calc(6px + var(--safe-b));
+  }
+  .nav-btn{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    background:none;border:none;color:var(--dim);font-size:0.62em;
+    font-family:'Manrope',sans-serif;cursor:pointer;padding:4px 12px;
+    transition:color 0.2s;
+  }
+  .nav-btn .icon{font-size:1.6em}
+  .nav-btn.active{color:var(--green)}
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar{width:2px}::-webkit-scrollbar-thumb{background:var(--border)}
+
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .live-dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite;display:inline-block;margin-right:3px}
+</style>
+</head>
+<body>
+
+<!-- Price Bar -->
+<div class="price-bar">
+  <div class="price-item">
+    <div class="name">BTC</div>
+    <div class="price" id="btcPrice">--</div>
+    <div class="change" id="btcChange">--</div>
+  </div>
+  <div class="price-item">
+    <div class="name">ETH</div>
+    <div class="price" id="ethPrice">--</div>
+    <div class="change" id="ethChange">--</div>
+  </div>
+  <div class="price-item">
+    <div class="name" id="modeLabel">--</div>
+    <div class="price" id="equityVal">--</div>
+    <div class="change" id="todayPnl">--</div>
+  </div>
+</div>
+
+<!-- Pull to refresh indicator -->
+<div class="ptr-indicator" id="ptrIndicator">释放刷新...</div>
+
+<!-- ═══ Page: Overview ═══ -->
+<div class="page active" id="pageOverview">
+  <div class="stats-row">
+    <div class="stat"><div class="label">总盈亏</div><div class="val" id="mTotalPnl">--</div><div class="sub" id="mReturn">--</div></div>
+    <div class="stat"><div class="label">胜率</div><div class="val" id="mWinRate">--</div><div class="sub" id="mWinLoss">--</div></div>
+    <div class="stat"><div class="label">盈亏因子</div><div class="val" id="mPF">--</div><div class="sub" id="mRR">--</div></div>
+    <div class="stat"><div class="label">最大回撤</div><div class="val" id="mDD">--</div><div class="sub" id="mDDInfo">--</div></div>
+  </div>
+
+  <div class="sec-title">今日</div>
+  <div class="today-grid">
+    <div class="today-item"><div class="tl">交易</div><div class="tv" id="tdTrades">--</div></div>
+    <div class="today-item"><div class="tl">胜/负</div><div class="tv" id="tdWL">--</div></div>
+    <div class="today-item"><div class="tl">盈亏</div><div class="tv" id="tdPnl">--</div></div>
+  </div>
+
+  <div class="sec-title">持仓</div>
+  <div class="card" id="positionsCard"><div class="empty">无持仓</div></div>
+
+  <div class="sec-title">最近轮次</div>
+  <div class="card" id="roundsCard"><div class="empty">暂无</div></div>
+  <div class="pager" id="roundPager" style="display:none">
+    <span id="roundPagerInfo"></span>
+    <div class="pager-btns">
+      <button class="pager-btn" id="roundPrev" onclick="roundPage(-1)">上一页</button>
+      <button class="pager-btn" id="roundNext" onclick="roundPage(1)">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Page: Positions ═══ -->
+<div class="page" id="pagePositions">
+  <div class="sec-title">当前持仓</div>
+  <div class="card" id="positionsCard2"><div class="empty">无持仓</div></div>
+
+  <div class="sec-title">信号统计</div>
+  <div class="card" id="signalsCard"><div class="empty">暂无</div></div>
+
+  <div class="sec-title">策略笔记</div>
+  <div class="card"><div class="notes-body" id="notesBody">加载中...</div></div>
+</div>
+
+<!-- ═══ Page: History ═══ -->
+<div class="page" id="pageHistory">
+  <div class="sec-title">交易历史</div>
+  <div class="card" id="tradesCard"><div class="empty">暂无</div></div>
+  <div class="pager" id="tradePager" style="display:none">
+    <span id="tradePagerInfo"></span>
+    <div class="pager-btns">
+      <button class="pager-btn" id="tradePrev" onclick="tradePage(-1)">上一页</button>
+      <button class="pager-btn" id="tradeNext" onclick="tradePage(1)">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Page: AI ═══ -->
+<div class="page" id="pageAI">
+  <div class="sec-title">AI 决策推理</div>
+  <div class="card" id="reasoningCard"><div class="empty">暂无</div></div>
+
+  <div class="sec-title">复盘记录</div>
+  <div class="card" id="reviewsCard"><div class="empty">暂无</div></div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="switchPage('pageOverview',this)"><span class="icon">📊</span>概览</button>
+  <button class="nav-btn" onclick="switchPage('pagePositions',this)"><span class="icon">💰</span>持仓</button>
+  <button class="nav-btn" onclick="switchPage('pageHistory',this)"><span class="icon">📋</span>历史</button>
+  <button class="nav-btn" onclick="switchPage('pageAI',this)"><span class="icon">🧠</span>AI</button>
+</div>
+
+<script>
+const API = location.origin;
+const _token = new URLSearchParams(location.search).get('token') || '';
+const INITIAL_EQUITY = 3000;
+let livePrices = {};
+
+// ── Utils ──
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmt(n,dec=2){if(n==null||isNaN(n))return'--';return Number(n).toFixed(dec)}
+function fmtPnl(n){if(n==null||isNaN(n))return'--';return`${n>=0?'+':''}$${fmt(n)}`}
+function fmtTime(ts){if(!ts)return'--';const d=new Date(ts);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
+function fmtDur(m){if(!m)return'--';if(m<60)return`${Math.round(m)}m`;if(m<1440)return`${(m/60).toFixed(1)}h`;return`${(m/1440).toFixed(1)}d`}
+
+async function fetchJSON(path){
+  const sep=path.includes('?')?'&':'?';
+  const url=_token?API+path+sep+'token='+_token:API+path;
+  try{return await(await fetch(url)).json()}catch(e){console.error(path,e);return null}
+}
+
+function renderMarkdown(text){
+  const safe=esc(text);
+  return safe.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`(.+?)`/g,'<code>$1</code>').replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g,m=>`<ul>${m}</ul>`).replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>');
+}
+
+// ── Nav ──
+function switchPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ── Prices ──
+async function loadPrices(){
+  const p=await fetchJSON('/api/prices');
+  if(!p)return;
+  livePrices={};
+  if(p.btc&&p.btc.price){
+    document.getElementById('btcPrice').textContent='$'+Number(p.btc.price).toLocaleString();
+    const chg=p.btc.change||'--';
+    const el=document.getElementById('btcChange');
+    el.textContent=chg;el.className='change '+(String(chg).startsWith('-')?'negative':'positive');
+    livePrices.btc=p.btc.price;
+  }
+  if(p.eth&&p.eth.price){
+    document.getElementById('ethPrice').textContent='$'+Number(p.eth.price).toLocaleString();
+    const chg=p.eth.change||'--';
+    const el=document.getElementById('ethChange');
+    el.textContent=chg;el.className='change '+(String(chg).startsWith('-')?'negative':'positive');
+    livePrices.eth=p.eth.price;
+  }
+}
+
+// ── Mode ──
+async function loadMode(){
+  const m=await fetchJSON('/api/mode');
+  if(m){
+    const el=document.getElementById('modeLabel');
+    el.textContent=m.demo?'DEMO':'LIVE';
+    el.className='name mode-badge '+(m.demo?'mode-demo':'mode-live');
+  }
+}
+
+// ── Stats ──
+async function loadStats(){
+  const s=await fetchJSON('/api/stats');
+  if(!s)return;
+  const total=s.total||0;
+  const equity=INITIAL_EQUITY+(s.total_pnl||0);
+  document.getElementById('equityVal').textContent='$'+fmt(equity);
+
+  if(total>0){
+    const pnl=s.total_pnl||0;
+    const ret=pnl/INITIAL_EQUITY*100;
+    const pnlEl=document.getElementById('mTotalPnl');
+    pnlEl.textContent=fmtPnl(pnl);pnlEl.className='val '+(pnl>=0?'positive':'negative');
+    document.getElementById('mReturn').textContent=`${ret>=0?'+':''}${fmt(ret)}% ROI`;
+
+    const wrEl=document.getElementById('mWinRate');
+    wrEl.textContent=fmt(s.win_rate*100,1)+'%';
+    document.getElementById('mWinLoss').textContent=`${s.wins}W / ${s.losses}L`;
+
+    const pfEl=document.getElementById('mPF');
+    pfEl.textContent=s.profit_factor===Infinity?'~':fmt(s.profit_factor);
+    document.getElementById('mRR').textContent='R:R '+fmt(s.pnl_ratio);
+
+    const dd=s.max_drawdown||0;
+    const ddEl=document.getElementById('mDD');
+    ddEl.textContent=(dd>0?'-$':'$')+fmt(dd);ddEl.className='val '+(dd>0?'negative':'');
+    document.getElementById('mDDInfo').textContent=`${fmt(s.max_drawdown_pct,1)}% | ${s.max_consecutive_loss}L streak`;
+  }
+}
+
+// ── Today ──
+async function loadToday(){
+  const t=await fetchJSON('/api/today');
+  if(!t)return;
+  document.getElementById('tdTrades').textContent=t.trades;
+  document.getElementById('tdWL').textContent=`${t.wins}/${t.losses}`;
+  const pEl=document.getElementById('tdPnl');
+  pEl.textContent=fmtPnl(t.pnl);pEl.className='tv '+(t.pnl>=0?'positive':'negative');
+  const tpEl=document.getElementById('todayPnl');
+  tpEl.textContent='Today '+fmtPnl(t.pnl);tpEl.className='change '+(t.pnl>=0?'positive':'negative');
+}
+
+// ── Positions ──
+async function loadPositions(){
+  const open=await fetchJSON('/api/open');
+  const html=renderPositions(open);
+  document.getElementById('positionsCard').innerHTML=html;
+  document.getElementById('positionsCard2').innerHTML=html;
+}
+
+function renderPositions(open){
+  if(!open||!open.length)return'<div class="empty">无持仓</div>';
+  return open.map(t=>{
+    const isLong=t.side==='buy';
+    const coin=(t.coin||'').replace('-USDT-SWAP','');
+    const key=coin.toLowerCase();
+    const lp=livePrices[key]||0;
+    let pnlStr='--',pnlCls='';
+    if(lp&&t.entry_price){
+      const dir=isLong?1:-1;
+      const ctVal=key==='btc'?0.01:0.1;
+      const pnl=dir*(lp-t.entry_price)*(t.sheets||1)*ctVal;
+      pnlCls=pnl>=0?'positive':'negative';
+      pnlStr=fmtPnl(pnl);
+    }
+    return`<div class="pos-card ${isLong?'long':'short'}">
+      <div class="pos-head">
+        <span class="pos-coin">${coin} <span class="badge ${isLong?'badge-long':'badge-short'}">${isLong?'LONG':'SHORT'}</span></span>
+        <span class="${pnlCls}" style="font-weight:700;font-family:'JetBrains Mono',monospace">${pnlStr}</span>
+      </div>
+      <div class="pos-grid">
+        <span class="k">入场</span><span class="v">$${fmt(t.entry_price)}</span>
+        <span class="k">实时</span><span class="v">${lp?'<span class="live-dot"></span>$'+Number(lp).toLocaleString():'--'}</span>
+        <span class="k">止损</span><span class="v negative">${fmt(t.stop_loss)}</span>
+        <span class="k">止盈</span><span class="v positive">${fmt(t.take_profit)}</span>
+        <span class="k">杠杆</span><span class="v">${t.leverage||'--'}x</span>
+        <span class="k">张数</span><span class="v">${t.sheets||'--'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Rounds ──
+const ROUND_PP=10;let roundOffset=0,roundTotal=0;
+function roundPage(d){roundOffset=Math.max(0,Math.min(roundOffset+d*ROUND_PP,roundTotal-1));loadRounds()}
+
+async function loadRounds(){
+  const data=await fetchJSON(`/api/rounds?n=${ROUND_PP}&offset=${roundOffset}`);
+  const el=document.getElementById('roundsCard');
+  if(!data||!data.items||!data.items.length){el.innerHTML='<div class="empty">暂无</div>';document.getElementById('roundPager').style.display='none';return}
+  roundTotal=data.total;
+  el.innerHTML=data.items.map(r=>{
+    const ac=r.action.toLowerCase();
+    const cls=ac.includes('hold')?'hold':ac.includes('open')?'open':ac.includes('close')?'close':'hold';
+    const prices=(r.btc_price||r.eth_price)?`B:${r.btc_price?Number(r.btc_price).toFixed(0):'--'} E:${r.eth_price?Number(r.eth_price).toFixed(1):'--'}`:'';
+    const summary=esc(r.summary)||'--';
+    const market=esc(r.market_snapshot)||'';
+    return`<div class="round-card" onclick="this.classList.toggle('expanded')">
+      <div class="round-top"><span class="round-action ${cls}">${r.action.toUpperCase()}</span><span class="round-time">${fmtTime(r.timestamp)}</span></div>
+      <div class="round-summary">${summary}</div>
+      <div class="round-prices">${prices}</div>
+      <div class="round-detail">${market?summary+'\n\n'+market:summary}</div>
+    </div>`;
+  }).join('');
+  const pg=document.getElementById('roundPager');
+  pg.style.display=roundTotal>ROUND_PP?'flex':'none';
+  document.getElementById('roundPagerInfo').textContent=`${Math.floor(roundOffset/ROUND_PP)+1}/${Math.ceil(roundTotal/ROUND_PP)}`;
+  document.getElementById('roundPrev').disabled=roundOffset===0;
+  document.getElementById('roundNext').disabled=roundOffset+ROUND_PP>=roundTotal;
+}
+
+// ── Trades ──
+const TRADE_PP=10;let tradeOffset=0,tradeTotal=0;
+function tradePage(d){tradeOffset=Math.max(0,Math.min(tradeOffset+d*TRADE_PP,tradeTotal-1));loadTrades()}
+
+async function loadTrades(){
+  const data=await fetchJSON(`/api/trades?n=${TRADE_PP}&offset=${tradeOffset}`);
+  const el=document.getElementById('tradesCard');
+  if(!data||!data.items||!data.items.length){el.innerHTML='<div class="empty">暂无</div>';document.getElementById('tradePager').style.display='none';return}
+  tradeTotal=data.total;
+  el.innerHTML=data.items.map(t=>{
+    const pnl=t.pnl||0;const cls=pnl>=0?'positive':'negative';
+    const isLong=t.side==='buy';const coin=(t.coin||'').replace('-USDT-SWAP','');
+    return`<div class="trade-card">
+      <div class="trade-head">
+        <div class="trade-coin">#${t.id} ${coin} <span class="badge ${isLong?'badge-long':'badge-short'}">${isLong?'LONG':'SHORT'}</span></div>
+        <div class="trade-pnl ${cls}">${t.exit_price?fmtPnl(pnl):'<span class="badge badge-open">OPEN</span>'}</div>
+      </div>
+      <div class="trade-meta">
+        <span>入场 $${fmt(t.entry_price)}</span><span>出场 ${t.exit_price?'$'+fmt(t.exit_price):'--'}</span>
+        <span>${t.sheets||'--'}ct ${t.leverage||'--'}x</span><span>${fmtDur(t.duration_min)} ${t.close_reason||''}</span>
+        <span>${fmtTime(t.timestamp)}</span><span>${t.pnl_pct!=null?fmt(t.pnl_pct,1)+'%':'--'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  const pg=document.getElementById('tradePager');
+  pg.style.display=tradeTotal>TRADE_PP?'flex':'none';
+  document.getElementById('tradePagerInfo').textContent=`${Math.floor(tradeOffset/TRADE_PP)+1}/${Math.ceil(tradeTotal/TRADE_PP)}`;
+  document.getElementById('tradePrev').disabled=tradeOffset===0;
+  document.getElementById('tradeNext').disabled=tradeOffset+TRADE_PP>=tradeTotal;
+}
+
+// ── Reasoning ──
+async function loadReasoning(){
+  const data=await fetchJSON('/api/recent-reasoning');
+  const el=document.getElementById('reasoningCard');
+  if(!data||!data.length){el.innerHTML='<div class="empty">暂无</div>';return}
+  el.innerHTML=data.map(tr=>{
+    const r=tr.reasoning||{};
+    const sideMap={buy:'LONG',sell:'SHORT',long:'LONG',short:'SHORT'};
+    const side=sideMap[(tr.side||'').toLowerCase()]||'';
+    const cls=side==='LONG'?'badge-long':side==='SHORT'?'badge-short':'badge-open';
+    const coin=(tr.coin||'').replace('-USDT-SWAP','');
+    const indicators=typeof tr.indicators_used==='string'?tr.indicators_used.split('+').filter(Boolean):[];
+    let body='';
+    if(r.market_state)body+=`<div class="field"><span class="field-label">市场:</span> ${esc(r.market_state)}</div>`;
+    if(r.direction)body+=`<div class="field"><span class="field-label">方向:</span> ${esc(r.direction)}</div>`;
+    if(r.trigger)body+=`<div class="field"><span class="field-label">信号:</span> ${esc(r.trigger)}</div>`;
+    if(r.risk)body+=`<div class="field"><span class="field-label">风控:</span> ${esc(r.risk)}</div>`;
+    if(r.concern)body+=`<div class="field"><span class="field-label">顾虑:</span> ${esc(r.concern)}</div>`;
+    if(r.why_hold)body+=`<div class="field"><span class="field-label">观望:</span> ${esc(r.why_hold)}</div>`;
+    if(r.watching)body+=`<div class="field"><span class="field-label">关注:</span> ${esc(r.watching)}</div>`;
+    let statusHtml='';
+    if(tr.status==='open')statusHtml='<span class="badge badge-open">OPEN</span>';
+    else if(tr.status==='closed'&&tr.pnl>=0)statusHtml=`<span class="badge badge-long">+${tr.pnl.toFixed(1)}</span>`;
+    else if(tr.status==='closed')statusHtml=`<span class="badge badge-short">${tr.pnl.toFixed(1)}</span>`;
+    return`<div class="reason-card">
+      <div class="reason-head"><div class="reason-info">#${tr.id} ${coin} <span class="badge ${cls}">${side}</span> ${statusHtml}</div><span class="round-time">${fmtTime(tr.timestamp)}</span></div>
+      <div class="reason-body">${body||'<span style="color:var(--dim)">无推理记录</span>'}</div>
+      ${indicators.length?'<div style="margin-top:6px">'+indicators.map(i=>`<span class="indicator-tag">${i}</span>`).join('')+'</div>':''}
+    </div>`;
+  }).join('');
+}
+
+// ── Signals ──
+async function loadSignals(){
+  const data=await fetchJSON('/api/signals');
+  const el=document.getElementById('signalsCard');
+  if(!data||!data.length){el.innerHTML='<div class="empty">暂无</div>';return}
+  const sorted=[...data].sort((a,b)=>{
+    const wrA=a.used_count>0?a.win_count/a.used_count:0;
+    const wrB=b.used_count>0?b.win_count/b.used_count:0;
+    return wrB-wrA||b.used_count-a.used_count;
+  });
+  el.innerHTML=sorted.map(s=>{
+    const wr=s.used_count>0?(s.win_count/s.used_count*100):0;
+    const wrCls=wr>=50?'positive':'negative';
+    const barColor=wr>=50?'var(--green)':wr>=40?'var(--yellow)':'var(--red)';
+    return`<div class="signal-item">
+      <div class="signal-combo"><span>${s.indicator_combo}</span><span class="wr-badge ${wrCls}">${fmt(wr,0)}%</span></div>
+      <div class="signal-info">${s.used_count}次 ${s.win_count}W/${s.used_count-s.win_count}L PnL <span class="${s.total_pnl>=0?'positive':'negative'}">${fmtPnl(s.total_pnl)}</span></div>
+      <div class="signal-bar"><div class="signal-bar-fill" style="width:${wr}%;background:${barColor}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Notes ──
+async function loadNotes(){
+  const data=await fetchJSON('/api/strategy-notes');
+  if(data&&data.content)document.getElementById('notesBody').innerHTML=renderMarkdown(data.content);
+}
+
+// ── Reviews ──
+async function loadReviews(){
+  const data=await fetchJSON('/api/reviews?n=20&offset=0');
+  const el=document.getElementById('reviewsCard');
+  if(!data||!data.items||!data.items.length){el.innerHTML='<div class="empty">暂无</div>';return}
+  el.innerHTML=data.items.map(r=>{
+    const cls=r.type==='weekly'?'badge-open':'badge-long';
+    const label=r.type==='weekly'?'WEEKLY':'DAILY';
+    return`<div class="reason-card">
+      <div class="reason-head"><span class="badge ${cls}">${label}</span><span class="round-time">${fmtTime(r.timestamp)}</span></div>
+      <div class="reason-body">${esc(r.content)}</div>
+      ${r.key_findings?`<div style="margin-top:6px;font-size:0.75em;color:var(--yellow)">${esc(r.key_findings)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── Pull to Refresh ──
+let touchStart=0,pulling=false;
+document.addEventListener('touchstart',e=>{if(window.scrollY===0)touchStart=e.touches[0].clientY});
+document.addEventListener('touchmove',e=>{
+  if(touchStart&&e.touches[0].clientY-touchStart>60&&window.scrollY===0){
+    pulling=true;document.getElementById('ptrIndicator').classList.add('show');
+  }
+});
+document.addEventListener('touchend',()=>{
+  if(pulling){pulling=false;document.getElementById('ptrIndicator').classList.remove('show');refreshAll()}
+  touchStart=0;
+});
+
+// ── Init ──
+let _refreshing=false;
+async function refreshAll(){
+  if(_refreshing)return;_refreshing=true;
+  try{
+    await Promise.all([loadPrices(),loadMode(),loadStats(),loadToday()]);
+    await Promise.all([loadPositions(),loadRounds(),loadTrades(),loadReasoning(),loadSignals(),loadNotes(),loadReviews()]);
+  }catch(e){console.error(e)}
+  _refreshing=false;
+}
+
+refreshAll();
+setInterval(refreshAll,60000);
+</script>
+</body>
+</html>

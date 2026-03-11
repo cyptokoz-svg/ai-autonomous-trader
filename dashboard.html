@@ -1318,6 +1318,7 @@
 
 <script>
 const API = '';
+const _token = new URLSearchParams(location.search).get('token') || '';
 const INITIAL_EQUITY = 3000;
 
 // ── i18n ──
@@ -1405,7 +1406,9 @@ function toggleLang() {
 }
 
 async function fetchJSON(path) {
-  try { return await (await fetch(API + path)).json(); }
+  const sep = path.includes('?') ? '&' : '?';
+  const url = _token ? API + path + sep + 'token=' + _token : API + path;
+  try { return await (await fetch(url)).json(); }
   catch(e) { console.error('API error:', path, e); return null; }
 }
 

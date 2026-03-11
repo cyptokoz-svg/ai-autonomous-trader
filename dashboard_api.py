@@ -4,12 +4,17 @@ AI 自主交易员 — Dashboard API
 """
 import json
 import time
+import base64
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from trade_db import get_conn, get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds, get_reviews, get_trades_paged
 from config import OKX_DEMO
 from pathlib import Path
 import urllib.request
+
+DASH_USER = "admin"
+DASH_PASS = "taoli2"
+DASH_TOKEN = "taoli2"
 
 _price_cache = {}
 _price_cache_time = 0
@@ -18,8 +23,87 @@ PORT = 8888
 
 
 class DashboardHandler(SimpleHTTPRequestHandler):
+    def _check_auth(self):
+        # Cookie auth
+        cookie = self.headers.get("Cookie", "")
+        for c in cookie.split(";"):
+            c = c.strip()
+            if c.startswith("dash_auth=") and c.split("=", 1)[1] == DASH_TOKEN:
+                return True
+        return False
+
+    def _serve_login(self, error=False):
+        msg = '<p style="color:#ff4757;margin-bottom:12px">密码错误</p>' if error else ''
+        html = f'''<!DOCTYPE html><html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>AI Trader Login</title>
+<style>
+  body{{background:#0a0a0f;color:#e0e0e0;font-family:'Manrope',sans-serif;display:flex;
+    justify-content:center;align-items:center;min-height:100vh;margin:0}}
+  .box{{background:#111118;border:1px solid #1c1c2c;border-radius:16px;padding:40px;
+    width:min(340px,90vw);text-align:center}}
+  h2{{margin-bottom:6px;font-size:1.4em;background:linear-gradient(135deg,#00d4aa,#4a9eff);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}}
+  .sub{{color:#6b7280;font-size:0.8em;margin-bottom:24px}}
+  input{{width:100%;padding:12px 16px;background:#1a1a28;border:1px solid #1c1c2c;
+    border-radius:8px;color:#e0e0e0;font-size:1em;margin-bottom:14px;outline:none;
+    font-family:'JetBrains Mono',monospace}}
+  input:focus{{border-color:#00d4aa}}
+  button{{width:100%;padding:12px;background:linear-gradient(135deg,#00d4aa,#4a9eff);
+    border:none;border-radius:8px;color:#0a0a0f;font-weight:700;font-size:1em;cursor:pointer}}
+  button:active{{opacity:0.8}}
+</style></head><body>
+<div class="box">
+  <h2>AI Trader</h2>
+  <div class="sub">Autonomous Trading Dashboard</div>
+  {msg}
+  <form method="POST" action="/login">
+    <input type="password" name="password" placeholder="输入密码" autofocus>
+    <button type="submit">登录</button>
+  </form>
+</div></body></html>'''
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(html.encode())
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/login":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode()
+            params = parse_qs(body)
+            pwd = params.get("password", [""])[0]
+            if pwd == DASH_PASS:
+                self.send_response(302)
+                self.send_header("Set-Cookie", f"dash_auth={DASH_TOKEN}; Path=/; Max-Age=2592000; SameSite=Lax")
+                self.send_header("Location", "/")
+                self.end_headers()
+            else:
+                self._serve_login(error=True)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/login":
+            self._serve_login()
+            return
+        if not self._check_auth():
+            # API 请求返回 401 JSON，页面请求跳转登录
+            if parsed.path.startswith("/api/"):
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"error":"unauthorized"}')
+            else:
+                self.send_response(302)
+                self.send_header("Location", "/login")
+                self.end_headers()
+            return
+
         path = parsed.path
 
         if path == "/api/stats":
@@ -59,6 +143,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_calendar())
         elif path == "/api/mode":
             self._json_response({"demo": OKX_DEMO})
+        elif path == "/mobile" or path == "/mobile.html":
+            self._serve_file("mobile.html")
         elif path == "/" or path == "/index.html":
             self._serve_html()
         else:
@@ -81,16 +167,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(data, ensure_ascii=False, default=str).encode())
 
     def _serve_html(self):
-        html_path = Path(__file__).parent / "dashboard.html"
-        if html_path.exists():
+        self._serve_file("dashboard.html")
+
+    def _serve_file(self, filename):
+        file_path = Path(__file__).parent / filename
+        if file_path.exists():
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(html_path.read_bytes())
+            self.wfile.write(file_path.read_bytes())
         else:
             self.send_response(404)
             self.end_headers()
-            self.wfile.write(b"dashboard.html not found")
+            self.wfile.write(f"{filename} not found".encode())
 
     def _get_all_closed(self):
         try:

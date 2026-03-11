@@ -157,6 +157,13 @@ async def main():
     report_path = Path(__file__).parent / "latest_report.txt"
     last_state = _load_last_state()
 
+    # 自动同步 Claude 记忆（DB → memory 文件）
+    try:
+        from stats import update_memory
+        update_memory()
+    except Exception as e:
+        print(f"⚠️ 记忆同步跳过: {e}")
+
     # 检查是否有持仓
     open_trades = get_open_trades()
     has_positions = len(open_trades) > 0

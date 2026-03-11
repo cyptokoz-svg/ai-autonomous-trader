@@ -26,9 +26,11 @@ else
     cd ai-autonomous-trader
 fi
 
-# 4. Python 依赖
+# 4. Python 虚拟环境 + 依赖
 echo "[4/6] 安装 Python 依赖..."
-pip3 install -q aiohttp pandas pandas_ta
+python3 -m venv venv
+source venv/bin/activate
+pip install -q aiohttp pandas pandas_ta
 
 # 5. OKX 配置检查
 echo "[5/6] 检查配置..."
@@ -57,11 +59,11 @@ echo ""
 echo "接下来手动执行："
 echo "  1. 编辑 ~/.okx/config.toml 填入 API 凭证"
 echo "  2. claude login  (登录 Claude Code)"
-echo "  3. python3 ~/ai-autonomous-trader/dashboard_api.py &  (启动 Dashboard)"
+echo "  3. ~/ai-autonomous-trader/venv/bin/python3 ~/ai-autonomous-trader/dashboard_api.py &  (启动 Dashboard)"
 echo "  4. 设置 cron:"
 echo "     crontab -e"
-echo "     */30 * * * * cd ~/ai-autonomous-trader && claude -p trigger.md >> ~/trader.log 2>&1"
-echo "     */10 * * * * cd ~/ai-autonomous-trader && python3 watchdog.py >> ~/watchdog.log 2>&1"
-echo "     0 2 * * * cd ~/ai-autonomous-trader && python3 backup_db.py >> ~/backup.log 2>&1"
+echo "     */30 * * * * cd ~/ai-autonomous-trader && venv/bin/python3 prepare.py && claude -p trigger.md >> ~/trader.log 2>&1"
+echo "     */10 * * * * cd ~/ai-autonomous-trader && venv/bin/python3 watchdog.py >> ~/watchdog.log 2>&1"
+echo "     0 2 * * * cd ~/ai-autonomous-trader && venv/bin/python3 backup_db.py >> ~/backup.log 2>&1"
 echo ""
 echo "Dashboard: http://$(curl -s ifconfig.me):8888"

@@ -9,45 +9,70 @@ AI 驱动的加密货币自主交易系统，专注 BTC/ETH 永续合约。基�
 ## 特性
 
 - **全自主交易** — 每 30 分钟自动分析市场、决策、执行，无需人工干预
+- **实时异动监控** — AI 每轮定义监控条件，watcher 常驻 10 秒轮询，突破/放量/异动秒级触发
 - **多时间框架分析** — 日线(趋势) → 4H(中期) → 1H/15m(入场)，20+ 技术指标
 - **硬编码风控** — 单笔亏损 ≤5%、最大回撤 ≤20%、杠杆 ≤5x、必须止损
+- **持久记忆系统** — DB 量化数据自动同步到 Claude 记忆，跨会话保持认知，越跑越聪明
 - **自我学习** — 每日/每周自动复盘，淘汰失效策略，进化有效规则
-- **实时 Dashboard** — 权益曲线、持仓监控、AI 推理过程、信号胜率排名全透明
-- **生产级可靠** — 看门狗故障告警、Telegram 通知、数据库自动备份
+- **实时 Dashboard** — 权益曲线、持仓监控、AI 推理过程、信号胜率排名全透明（桌面 + 手机 PWA）
+- **生产级可靠** — 锁机制防并发、超时保护、看门狗告警、Telegram 通知、数据库自动备份
 - **模拟/实盘切换** — 一键切换 Demo/Live 模式
 
 ## 架构
 
 ```
-┌─────────────────────────────────────────────┐
-│              Dashboard (HTML)                │  ← localhost:8888
-├─────────────────────────────────────────────┤
-│            Dashboard API (Python)            │  ← HTTP Server
-├──────────┬──────────┬───────────────────────┤
-│ Data     │ Risk     │ Trade DB              │
-│ Engine   │ Check    │ (SQLite)              │
-├──────────┴──────────┴───────────────────────┤
-│          OKX API (MCP / REST)               │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│         Dashboard (desktop + mobile PWA)             │
+├──────────────────────────────────────────────────────┤
+│              Dashboard API (Python)                  │  ← Cookie 认证
+├───────────┬──────────┬───────────────────────────────┤
+│ Data      │ Risk     │ Trade DB (SQLite)             │
+│ Engine    │ Check    │ trades/rounds/signals/reviews  │
+├───────────┴──────────┴───────────────────────────────┤
+│                  触发层                               │
+│  ┌─────────────┐    ┌──────────────────────┐         │
+│  │ Cron 30min  │    │ Watcher (常驻10s轮询) │         │
+│  │ run_trigger │◄──►│ watch_condition.py    │         │
+│  │   .sh       │锁  │ (AI每轮生成)          │         │
+│  └──────┬──────┘    └──────────┬───────────┘         │
+│         └──────────┬───────────┘                     │
+│                    ▼                                 │
+│         prepare.py → claude -p trigger.md            │
+│              ↓ 自动同步                               │
+│         trades.db → Claude 记忆文件                   │
+├──────────────────────────────────────────────────────┤
+│              OKX API (MCP / REST)                    │
+└──────────────────────────────────────────────────────┘
 ```
 
 ## 文件说明
 
 | 文件 | 说明 |
 |------|------|
-| `dashboard.html` | 前端仪表盘（单文件，含 CSS/JS） |
-| `dashboard_api.py` | 后端 API 服务器，端口 8888 |
-| `data_engine.py` | 数据引擎：拉取 K 线 + 计算 20+ 技术指标 |
-| `trade_db.py` | 数据库层：交易记录、轮次日志、复盘 |
+| **核心流程** | |
+| `trigger.md` | AI 触发 Prompt：每轮执行流程（含记忆同步指令） |
+| `ai-trader-prompt.md` | AI 分析决策 Prompt：交易逻辑核心 |
+| `prepare.py` | 智能报告生成 + 自动同步 DB → Claude 记忆 |
 | `risk_check.py` | 风控硬检查：铁律不可被 AI 绕过 |
-| `prepare.py` | 智能报告生成：增量输出，节省 token |
-| `stats.py` | 统计报告生成 |
+| **实时监控** | |
+| `watcher.py` | 常驻价格监控：10s 轮询，AI 条件触发，锁机制防并发 |
+| `run_trigger.sh` | Cron 触发脚本：带锁机制，与 watcher 协调 |
+| `watch_condition.py` | AI 每轮生成的监控条件（动态覆盖） |
+| **数据层** | |
+| `data_engine.py` | 数据引擎：拉取 K 线 + 计算 20+ 技术指标 |
+| `trade_db.py` | 数据库层：交易记录、轮次日志、信号统计、复盘 |
+| `stats.py` | 统计报告 + 自动更新 Claude 记忆文件 |
+| `config.py` | 全局配置：交易对、时间框架、EMA 参数 |
+| **前端** | |
+| `dashboard.html` | 桌面端仪表盘（单文件，含 CSS/JS） |
+| `mobile.html` | 手机端 PWA（iPhone 适配，底部 Tab 导航） |
+| `dashboard_api.py` | 后端 API + Cookie 登录认证 |
+| **运维** | |
 | `notify.py` | Telegram 通知：开仓/平仓/异常推送 |
 | `watchdog.py` | 故障看门狗：系统停摆、孤儿持仓、API 告警 |
 | `backup_db.py` | 数据库自动备份（保留最近 7 份） |
-| `config.py` | 全局配置：交易对、时间框架、EMA 参数 |
-| `trigger.md` | AI 触发 Prompt：每轮执行流程 |
-| `ai-trader-prompt.md` | AI 分析决策 Prompt：交易逻辑核心 |
+| `deploy.sh` | 云服务器一键部署脚本 |
+| `test_watcher.py` | Watcher 单元测试（41 个用例） |
 
 ## 快速开始
 
@@ -135,10 +160,15 @@ OKX API 凭证需配置在 `~/.okx/config.toml`（见步骤 3）。
 使用 [Claude Code](https://claude.ai) 实现自主交易循环：
 
 ```bash
-# 每 30 分钟由 cron 触发 Claude Code，执行 trigger.md 中的完整流程
-# 示例 crontab:
-*/30 * * * * cd ~/Desktop/ai-autonomous-trader && claude -p trigger.md
+# 设置 cron 定时触发（每 30 分钟）
+crontab -e
+*/30 * * * * ~/ai-autonomous-trader/run_trigger.sh >> ~/ai-autonomous-trader/cron.log 2>&1
+
+# 启动实时异动监控（常驻后台）
+tmux new -d -s watcher "cd ~/ai-autonomous-trader && python3 watcher.py"
 ```
+
+`run_trigger.sh` 带锁机制，与 `watcher.py` 互斥，防止并发执行。
 
 ## 风控铁律
 
@@ -167,6 +197,8 @@ OKX API 凭证需配置在 `~/.okx/config.toml`（见步骤 3）。
 - 策略笔记
 - 中英文切换
 - Demo/Live 模式指示
+- Cookie 登录认证（密码保护）
+- 手机端 PWA（`mobile.html`，iPhone 适配，可添加到主屏幕）
 
 ## 模拟 ↔ 实盘切换
 

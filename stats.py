@@ -137,6 +137,23 @@ def update_memory():
             sig_content += f"| {s['indicator_combo']} | {s['used_count']} | {wr:.0%} | ${s['total_pnl']:.2f} |\n"
         sig_path.write_text(sig_content)
 
+    # 更新 trading-log.md（最近5笔教训）
+    recent = get_recent_trades(5)
+    if recent:
+        log_path = memory_dir / "trading-log.md"
+        log_content = "# 最近交易 & 教训\n\n"
+        log_content += "> 自动更新，来源: trades.db。只保留最近5笔\n\n"
+        for t in recent:
+            pnl = t.get("pnl") or 0
+            coin = t.get("coin", "?")
+            side = t.get("side", "?")
+            reason = t.get("close_reason", "")
+            lessons = t.get("lessons", "")
+            log_content += f"- **#{t['id']} {coin} {side}** ${pnl:+.2f} — {reason}\n"
+            if lessons:
+                log_content += f"  - 教训: {lessons}\n"
+        log_path.write_text(log_content)
+
     print("memory 文件已更新")
 
 
