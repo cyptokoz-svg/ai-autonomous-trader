@@ -128,6 +128,7 @@
    - history: `{"btc": deque([{price, vol24h, high24h, low24h, open24h, ts}, ...])}`（最近1小时，每10秒一条）
    - 返回: `(triggered: bool, reason: str)`
    - 触发后有 10 分钟冷却期
+   - **docstring 必须用中文描述具体条件**，例如 `"""BTC突破71500或跌破69000; ETH跌破2100"""`
    - 写入方式：`cat > watch_condition.py << 'PYEOF' ... PYEOF`
 
 ## 注意

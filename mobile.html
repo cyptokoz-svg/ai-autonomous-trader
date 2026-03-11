@@ -207,7 +207,7 @@
   </div>
 </div>
 
-<div id="watcherBar" style="background:#1a1a2e;padding:5px 12px;display:flex;align-items:center;gap:8px;font-size:0.78em;color:#8888aa;border-bottom:1px solid #2a2a3e;">
+<div id="watcherBar" style="background:#1a1a2e;padding:5px 12px;display:flex;align-items:center;gap:8px;font-size:0.78em;color:#8888aa;border-bottom:1px solid #2a2a3e;position:sticky;top:0;z-index:100;">
   <span id="wDot" style="width:7px;height:7px;border-radius:50%;background:#555;display:inline-block;flex-shrink:0;"></span>
   <span id="wCond" style="color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">--</span>
   <span id="wTime" style="color:#666;flex-shrink:0;">--</span>
@@ -599,7 +599,7 @@ async function refreshAll(){
 
 async function loadWatcher(){
   try{
-    const d=await(await fetch(BASE+'/api/watcher')).json();
+    const d=await fetchJSON('/api/watcher');if(!d)return;
     document.getElementById('wDot').style.background=d.running?'#00d4aa':'#ff4444';
     document.getElementById('wCond').textContent=d.condition||'No condition';
     document.getElementById('wTime').textContent=d.last_trigger?'⚡'+d.last_trigger.slice(11,19):'';

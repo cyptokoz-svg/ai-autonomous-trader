@@ -324,16 +324,17 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             result["running"] = bool(out.strip())
         except Exception:
             result["running"] = False
-        # 读监控条件
+        # 读监控条件（从 docstring 提取）
         cond_file = project / "watch_condition.py"
         if cond_file.exists():
             try:
-                first_line = cond_file.read_text().split("\n")
-                for line in first_line:
-                    line = line.strip().strip('"').strip("'")
-                    if line and not line.startswith("#") and not line.startswith("import") and not line.startswith("def"):
-                        result["condition"] = line
-                        break
+                text = cond_file.read_text()
+                import re
+                m = re.search(r'"""(.+?)"""', text, re.DOTALL)
+                if not m:
+                    m = re.search(r"'''(.+?)'''", text, re.DOTALL)
+                if m:
+                    result["condition"] = m.group(1).strip()
             except Exception:
                 pass
         # 读日志最后几行
