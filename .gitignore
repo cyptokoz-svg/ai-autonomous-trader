@@ -13,6 +13,7 @@ __pycache__/
 
 # Reports (generated)
 latest_report.txt
+.last_report_state.json
 
 # Backups
 backups/
