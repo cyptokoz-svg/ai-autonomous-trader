@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from config import OKX_DEMO
 from data_engine import DataEngine
-from trade_db import get_stats, get_recent_trades, get_open_trades, get_signal_stats
+from trade_db import get_stats, get_recent_trades, get_open_trades, get_signal_stats, get_recent_rounds
 
 
 def fetch_account_summary() -> str:
@@ -69,6 +69,30 @@ def fetch_account_summary() -> str:
     return "\n".join(lines)
 
 
+def fetch_recent_context() -> str:
+    """获取最近几轮的决策摘要，让 AI 知道上轮留下了什么观察"""
+    data = get_recent_rounds(n=5, offset=0)
+    items = data.get("items", [])
+    if not items:
+        return ""
+
+    lines = ["## 最近轮次记录（你上几轮的决策，请关联）", ""]
+    for r in reversed(items):  # 从旧到新
+        ts = r.get("timestamp", "")[:16]
+        action = r.get("action", "")
+        summary = r.get("summary", "")
+        btc = r.get("btc_price", 0)
+        eth = r.get("eth_price", 0)
+        prices = f"BTC:{btc:.0f} ETH:{eth:.1f}" if btc else ""
+        lines.append(f"- [{ts}] **{action}** {prices}")
+        if summary:
+            lines.append(f"  > {summary}")
+    lines.append("")
+    lines.append("⚠️ 如果上轮提到了要关注的价位/信号/条件，本轮必须跟进检查是否成立。")
+    lines.append("")
+    return "\n".join(lines)
+
+
 async def main():
     mode = "模拟盘" if OKX_DEMO else "实盘"
     print(f"[{mode}] 正在拉取数据...")
@@ -87,6 +111,7 @@ async def main():
         f"# AI 交易员数据报告 — {now_str}",
         f"# 模式: {mode}",
         "",
+        fetch_recent_context(),
         engine.generate_report(),
         fetch_account_summary(),
     ]
